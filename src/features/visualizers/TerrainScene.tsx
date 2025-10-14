@@ -21,7 +21,7 @@ export const TerrainScene: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const { analyser, getFrequencyData } = useAudio();
   const { settings } = useVisualizerSettings();
-  const { terrain: terrainSettings } = settings;
+  const terrainSettings = settings.terrain;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -151,7 +151,7 @@ export const TerrainScene: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="relative aspect-[16/9] w-full min-h-[26rem] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950"
+      className="relative aspect-[16/9] w-full min-h-[26rem] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/80"
     />
   );
 };

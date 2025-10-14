@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useVisualizerSettings, VisualizerSection, VisualizerSettings } from './VisualizerSettingsProvider';
 
 interface ControlDefinition<Section extends VisualizerSection> {
@@ -10,6 +10,7 @@ interface ControlDefinition<Section extends VisualizerSection> {
   min: number;
   max: number;
   step?: number;
+  kind?: 'slider' | 'toggle';
   description?: string;
   displayMultiplier?: number;
 }
@@ -127,6 +128,8 @@ const computePanelDefinition = (pathname: string): ControlMap<VisualizerSection>
         { key: 'highWeight', label: 'High Weight', min: 0, max: 1.5, step: 0.05 },
         { key: 'colorBase', label: 'Color Base', min: 0, max: 1, step: 0.02 },
         { key: 'colorGain', label: 'Color Gain', min: 0, max: 2, step: 0.05 },
+        { key: 'autoSplats', label: 'Audio Reactive Mode', kind: 'toggle', description: 'Toggle between audio-driven splats and manual triggering.' },
+        { key: 'manualSplatCount', label: 'Manual Splat Count', min: 1, max: 80, step: 1 },
       ],
     };
   }
@@ -137,15 +140,74 @@ const computePanelDefinition = (pathname: string): ControlMap<VisualizerSection>
 export const VisualizerSettingsPanel: React.FC = () => {
   const pathname = usePathname();
   const config = useMemo(() => computePanelDefinition(pathname), [pathname]);
-  const { settings, updateSettings, resetSection } = useVisualizerSettings();
+  const { settings, updateSettings, resetSection, replaceSettings } = useVisualizerSettings();
   const [collapsed, setCollapsed] = useState(true);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const handleExport = () => {
+    try {
+      const data = JSON.stringify(settings, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'visualizer-settings.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.warn('Unable to export settings', error);
+    }
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as Partial<VisualizerSettings>;
+      replaceSettings(parsed);
+    } catch (error) {
+      console.warn('Unable to import settings', error);
+    } finally {
+      event.target.value = '';
+    }
+  };
+
 
   if (!config) return null;
 
   const sectionSettings = settings[config.section];
 
   const renderControl = (control: ControlDefinition<typeof config.section>) => {
-    const value = sectionSettings[control.key as keyof typeof sectionSettings] as number;
+    const rawValue = sectionSettings[control.key as keyof typeof sectionSettings] as unknown;
+
+    if (control.kind === 'toggle') {
+      const checked = Boolean(rawValue);
+      return (
+        <label key={String(control.key)} className="space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-300">
+            <span>{control.label}</span>
+            <span className="font-mono text-slate-200">{checked ? 'On' : 'Off'}</span>
+          </div>
+          <input
+            type="checkbox"
+            className="h-4 w-8 cursor-pointer appearance-none rounded-full bg-slate-600 transition checked:bg-emerald-500"
+            checked={checked}
+            onChange={() =>
+              updateSettings(config.section, {
+                [control.key]: !checked,
+              } as Partial<VisualizerSettings[typeof config.section]>)
+            }
+          />
+          {control.description ? (
+            <p className="text-[11px] text-slate-500">{control.description}</p>
+          ) : null}
+        </label>
+      );
+    }
+
+    const value = Number(rawValue) || 0;
     const displayValue = control.displayMultiplier ? value * control.displayMultiplier : value;
     return (
       <div key={String(control.key)} className="space-y-1">
@@ -194,14 +256,37 @@ export const VisualizerSettingsPanel: React.FC = () => {
       <div className={`mt-4 space-y-4 ${collapsed ? 'hidden lg:block' : 'block'}`}>
         {config.controls.map(renderControl)}
       </div>
-      <div className={`mt-4 flex items-center justify-between ${collapsed ? 'hidden lg:flex' : 'flex'}`}>
-        <button
-          type="button"
-          onClick={() => resetSection(config.section)}
-          className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-300 transition hover:border-red-500 hover:text-red-200"
-        >
-          Reset
-        </button>
+      <input
+        ref={importInputRef}
+        className="hidden"
+        type="file"
+        accept="application/json"
+        onChange={handleImport}
+      />
+      <div className={`mt-4 flex flex-wrap items-center justify-between gap-3 ${collapsed ? 'hidden lg:flex' : 'flex'}`}>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => resetSection(config.section)}
+            className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-300 transition hover:border-red-500 hover:text-red-200"
+          >
+            Reset Section
+          </button>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-300 transition hover:border-blue-500 hover:text-blue-200"
+          >
+            Download Config
+          </button>
+          <button
+            type="button"
+            onClick={() => importInputRef.current?.click()}
+            className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-300 transition hover:border-emerald-500 hover:text-emerald-200"
+          >
+            Load Config
+          </button>
+        </div>
         <span className="text-[11px] text-slate-500">Stored locally</span>
       </div>
     </aside>

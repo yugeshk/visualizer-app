@@ -64,6 +64,8 @@ export type FluidSettings = {
   highWeight: number;
   colorBase: number;
   colorGain: number;
+  autoSplats: boolean;
+  manualSplatCount: number;
 };
 
 export interface VisualizerSettings {
@@ -135,10 +137,31 @@ const defaultSettings: VisualizerSettings = {
     highWeight: 0.2,
     colorBase: 0.25,
     colorGain: 0.9,
+    autoSplats: true,
+    manualSplatCount: 12,
   },
 };
 
 const cloneDefaultSettings = (): VisualizerSettings => JSON.parse(JSON.stringify(defaultSettings));
+
+const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerSettings>): VisualizerSettings => ({
+  torus: { ...base.torus, ...(overrides?.torus ?? {}) },
+  sphere: { ...base.sphere, ...(overrides?.sphere ?? {}) },
+  terrain: { ...base.terrain, ...(overrides?.terrain ?? {}) },
+  particles: { ...base.particles, ...(overrides?.particles ?? {}) },
+  fluid: {
+    ...base.fluid,
+    ...(overrides?.fluid ?? {}),
+    autoSplats:
+      overrides?.fluid?.autoSplats === undefined
+        ? base.fluid.autoSplats
+        : Boolean(overrides.fluid.autoSplats),
+    manualSplatCount:
+      overrides?.fluid?.manualSplatCount === undefined
+        ? base.fluid.manualSplatCount
+        : Math.max(1, Number(overrides.fluid.manualSplatCount) || base.fluid.manualSplatCount),
+  },
+});
 
 export type VisualizerSection = keyof VisualizerSettings;
 
@@ -147,6 +170,7 @@ interface VisualizerSettingsContextValue {
   updateSettings: <Section extends VisualizerSection>(section: Section, values: Partial<VisualizerSettings[Section]>) => void;
   resetSection: (section: VisualizerSection) => void;
   resetAll: () => void;
+  replaceSettings: (next: Partial<VisualizerSettings>) => void;
 }
 
 const VisualizerSettingsContext = createContext<VisualizerSettingsContextValue | undefined>(undefined);
@@ -163,7 +187,7 @@ export const VisualizerSettingsProvider: React.FC<{ children: React.ReactNode }>
         return;
       }
       const parsed = JSON.parse(stored) as Partial<VisualizerSettings>;
-      setSettings((prev) => ({ ...prev, ...parsed }));
+      setSettings((prev) => mergeSections(prev, parsed));
     } catch (error) {
       console.warn('Unable to load visualizer settings', error);
     } finally {
@@ -201,12 +225,17 @@ export const VisualizerSettingsProvider: React.FC<{ children: React.ReactNode }>
     setSettings(cloneDefaultSettings());
   }, []);
 
+  const replaceSettings = useCallback((next: Partial<VisualizerSettings>) => {
+    setSettings(mergeSections(cloneDefaultSettings(), next));
+  }, []);
+
   const value = useMemo<VisualizerSettingsContextValue>(() => ({
     settings,
     updateSettings,
     resetSection,
     resetAll,
-  }), [settings, updateSettings, resetSection, resetAll]);
+    replaceSettings,
+  }), [replaceSettings, resetAll, resetSection, settings, updateSettings]);
 
   return (
     <VisualizerSettingsContext.Provider value={value}>

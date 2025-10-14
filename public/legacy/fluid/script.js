@@ -24,38 +24,7 @@ SOFTWARE.
 
 'use strict';
 
-// Mobile promo section
-
 window.ga = window.ga || function () {};
-
-const promoPopup = document.getElementsByClassName('promo')[0];
-const promoPopupClose = document.getElementsByClassName('promo-close')[0];
-
-if (promoPopup && promoPopupClose) {
-    if (isMobile()) {
-        setTimeout(() => {
-            promoPopup.style.display = 'table';
-        }, 20000);
-    }
-
-    promoPopupClose.addEventListener('click', () => {
-        promoPopup.style.display = 'none';
-    });
-} else {
-    console.info('Promo elements not found; skipping app promo overlay.');
-}
-
-const appleLink = document.getElementById('apple_link');
-appleLink.addEventListener('click', e => {
-    ga('send', 'event', 'link promo', 'app');
-    window.open('https://apps.apple.com/us/app/fluid-simulation/id1443124993');
-});
-
-const googleLink = document.getElementById('google_link');
-googleLink.addEventListener('click', e => {
-    ga('send', 'event', 'link promo', 'app');
-    window.open('https://play.google.com/store/apps/details?id=games.paveldogreat.fluidsimfree');
-});
 
 // Simulation section
 
@@ -110,6 +79,22 @@ let audioInjection = null;
 window.addEventListener('message', event => {
     const data = event.data;
     if (!data || data.source !== 'next-audio-bridge') return;
+
+    if (data.type === 'manual-splat') {
+        const requested = parseInt(data.count, 10);
+        const count = Math.max(1, Math.min(120, Number.isFinite(requested) ? requested : 20));
+        const colorArray = Array.isArray(data.color) && data.color.length === 3 ? data.color : null;
+        const color = colorArray
+            ? { r: colorArray[0], g: colorArray[1], b: colorArray[2] }
+            : generateColor();
+        splatStack.push({ count, color, strength: 1 });
+        return;
+    }
+
+    if (data.type === 'mode-change') {
+        return;
+    }
+
     if (data.type !== 'audio-energy') return;
     const energy = Math.max(0, Math.min(1, data.energy || 0));
     const colorArray = Array.isArray(data.color) && data.color.length === 3
@@ -243,7 +228,7 @@ function startGUI () {
     gui.add(config, 'PAUSED').name('paused').listen();
 
     gui.add({ fun: () => {
-        splatStack.push({ count: parseInt(Math.random() * 20) + 5 });
+        splatStack.push(parseInt(Math.random() * 20) + 5);
     } }, 'fun').name('Random splats');
 
     let bloomFolder = gui.addFolder('Bloom');
@@ -1448,27 +1433,16 @@ function splatPointer (pointer) {
     splat(pointer.texcoordX, pointer.texcoordY, dx, dy, pointer.color);
 }
 
-function multipleSplats (input) {
-    const payload = typeof input === 'number' ? { count: input } : (input || { count: 0 });
-    const amount = Math.max(0, payload.count || 0);
-    const overrideColor = payload.color || (audioInjection ? audioInjection.color : null);
-    const strength = payload.strength || (audioInjection ? audioInjection.strength : 0);
-
-    const velocityScale = 700 + strength * 1500;
-
+function multipleSplats (amount) {
     for (let i = 0; i < amount; i++) {
-        const baseColor = overrideColor
-            ? { r: overrideColor.r, g: overrideColor.g, b: overrideColor.b }
-            : generateColor();
-        const color = {
-            r: baseColor.r * 10.0,
-            g: baseColor.g * 10.0,
-            b: baseColor.b * 10.0,
-        };
+        const color = generateColor();
+        color.r *= 10.0;
+        color.g *= 10.0;
+        color.b *= 10.0;
         const x = Math.random();
         const y = Math.random();
-        const dx = velocityScale * (Math.random() - 0.5);
-        const dy = velocityScale * (Math.random() - 0.5);
+        const dx = 1000 * (Math.random() - 0.5);
+        const dy = 1000 * (Math.random() - 0.5);
         splat(x, y, dx, dy, color);
     }
 }
@@ -1555,7 +1529,7 @@ window.addEventListener('keydown', e => {
     if (e.code === 'KeyP')
         config.PAUSED = !config.PAUSED;
     if (e.key === ' ')
-        splatStack.push({ count: parseInt(Math.random() * 20) + 5 });
+        splatStack.push(parseInt(Math.random() * 20) + 5);
 });
 
 function updatePointerDownData (pointer, id, posX, posY) {

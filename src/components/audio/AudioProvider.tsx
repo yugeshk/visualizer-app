@@ -8,7 +8,7 @@ import {
   loadStoredAudio,
   savePlaybackState,
   storeAudioFile,
-} from '@/lib/storage/audioStore';
+} from '@/lib/storage/mediaStore';
 
 interface AudioContextValue {
   analyser: AnalyserNode | null;

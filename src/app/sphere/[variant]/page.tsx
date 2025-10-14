@@ -19,17 +19,18 @@ const variantCopy: Record<SphereVariant, { title: string; description: string }>
   },
 };
 
-export default function SphereVariantPage({
+export default async function SphereVariantPage({
   params,
 }: {
-  params: { variant: string };
+  params: Promise<{ variant: string }>;
 }) {
-  const variant = params.variant as SphereVariant;
-  if (!variantCopy[variant]) {
+  const { variant } = await params;
+  const typedVariant = variant as SphereVariant;
+  if (!variantCopy[typedVariant]) {
     notFound();
   }
 
-  const { title, description } = variantCopy[variant];
+  const { title, description } = variantCopy[typedVariant];
 
   return (
     <div className="space-y-6">
@@ -37,7 +38,7 @@ export default function SphereVariantPage({
         <h2 className="text-3xl font-semibold">Sphere Spectrum · {title}</h2>
         <p className="max-w-2xl text-sm text-slate-300">{description}</p>
       </section>
-      <SphereSpectrumScene variant={variant} />
+      <SphereSpectrumScene variant={typedVariant} />
     </div>
   );
 }
