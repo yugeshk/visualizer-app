@@ -2,7 +2,8 @@
 
 import { useAudio } from '@/components/audio/AudioProvider';
 import { useVisualizerSettings } from '@/components/settings/VisualizerSettingsProvider';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createFluidSimulation } from '@/lib/fluid/createFluidSimulation';
+import { useEffect, useMemo, useRef } from 'react';
 
 const average = (buffer: Uint8Array, start: number, end: number) => {
   if (end <= start) return 0;
@@ -16,13 +17,13 @@ const average = (buffer: Uint8Array, start: number, end: number) => {
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
 export const FluidFrame: React.FC = () => {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const simulationRef = useRef<ReturnType<typeof createFluidSimulation> | null>(null);
   const animationRef = useRef<number | null>(null);
   const lastColorRef = useRef<[number, number, number]>([0.4, 0.4, 0.5]);
   const { analyser, getFrequencyData } = useAudio();
   const { settings } = useVisualizerSettings();
   const fluidSettings = settings.fluid;
-  const [frameReady, setFrameReady] = useState(false);
 
   const baseColor = useMemo<[number, number, number]>(() => {
     const base = clamp01(fluidSettings.colorBase);
@@ -35,26 +36,47 @@ export const FluidFrame: React.FC = () => {
   }, [baseColor]);
 
   useEffect(() => {
-    if (!frameReady) return;
-    const targetWindow = iframeRef.current?.contentWindow;
-    if (!targetWindow) return;
-    targetWindow.postMessage(
-      {
-        source: 'next-audio-bridge',
-        type: 'mode-change',
-        auto: fluidSettings.autoSplats,
-      },
-      '*',
-    );
-  }, [frameReady, fluidSettings.autoSplats]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    try {
+      const simulation = createFluidSimulation(canvas);
+      simulationRef.current = simulation;
+      simulation.setPaused(false);
+    } catch (error) {
+      console.error('Unable to initialize fluid simulation', error);
+    }
+
+    return () => {
+      const simulation = simulationRef.current;
+      if (simulation) {
+        simulation.destroy();
+        simulationRef.current = null;
+      }
+      if (animationRef.current !== null) {
+        window.cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
-    if (!frameReady || !analyser || !fluidSettings.autoSplats) return;
+    if (!analyser || !fluidSettings.autoSplats) {
+      if (animationRef.current !== null) {
+        window.cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      return;
+    }
+
+    const simulation = simulationRef.current;
+    if (!simulation) return;
+
     const spectrum = new Uint8Array(analyser.frequencyBinCount);
 
     const loop = () => {
-      const targetWindow = iframeRef.current?.contentWindow;
-      if (!targetWindow) return;
+      const activeSimulation = simulationRef.current;
+      if (!activeSimulation) return;
 
       getFrequencyData(spectrum);
       const lowEnd = Math.floor(spectrum.length * 0.18);
@@ -76,15 +98,7 @@ export const FluidFrame: React.FC = () => {
       ];
       lastColorRef.current = color;
 
-      targetWindow.postMessage(
-        {
-          source: 'next-audio-bridge',
-          type: 'audio-energy',
-          energy,
-          color,
-        },
-        '*',
-      );
+      activeSimulation.injectAudioEnergy(energy, color);
 
       animationRef.current = window.requestAnimationFrame(loop);
     };
@@ -97,20 +111,13 @@ export const FluidFrame: React.FC = () => {
         animationRef.current = null;
       }
     };
-  }, [analyser, fluidSettings.autoSplats, fluidSettings.bassWeight, fluidSettings.energyBoost, fluidSettings.highWeight, fluidSettings.midWeight, fluidSettings.colorBase, fluidSettings.colorGain, frameReady, getFrequencyData]);
+  }, [analyser, fluidSettings.autoSplats, fluidSettings.bassWeight, fluidSettings.energyBoost, fluidSettings.highWeight, fluidSettings.midWeight, fluidSettings.colorBase, fluidSettings.colorGain, getFrequencyData]);
 
   const handleManualSplat = () => {
     try {
-      const targetWindow = iframeRef.current?.contentWindow;
-      if (!targetWindow) return;
-      targetWindow.postMessage(
-        {
-          source: 'next-audio-bridge',
-          type: 'manual-splat',
-          count: fluidSettings.manualSplatCount,
-          color: lastColorRef.current ?? baseColor,
-        },
-        '*',
+      simulationRef.current?.triggerManualSplats(
+        fluidSettings.manualSplatCount,
+        lastColorRef.current ?? baseColor,
       );
     } catch (error) {
       console.warn('Unable to trigger manual splat', error);
@@ -119,13 +126,9 @@ export const FluidFrame: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <iframe
-        ref={iframeRef}
-        onLoad={() => setFrameReady(true)}
-        src="/legacy/fluid/index.html"
-        title="Fluid Simulation"
+      <canvas
+        ref={canvasRef}
         className="h-[32rem] w-full overflow-hidden rounded-2xl border border-slate-800 shadow-lg"
-        allow="fullscreen"
       />
       {!fluidSettings.autoSplats && (
         <div className="flex flex-wrap items-center gap-3 text-sm text-slate-200">
