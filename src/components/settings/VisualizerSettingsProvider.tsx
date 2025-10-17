@@ -1,6 +1,10 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { FLUID_COLOR_PRESETS, PARTICLE_COLOR_PRESETS } from '@/lib/palettes';
+
+const DEFAULT_PARTICLE_PRESET = PARTICLE_COLOR_PRESETS[0]?.id ?? 'sunrise';
+const DEFAULT_FLUID_PRESET = FLUID_COLOR_PRESETS[0]?.id ?? 'aurora';
 
 export type TorusSettings = {
   lowScaleMultiplier: number;
@@ -60,6 +64,8 @@ export type ParticlesSettings = {
   saturation: number;
   lightnessBase: number;
   lightnessGain: number;
+  paletteMode: 'auto' | 'manual';
+  manualPreset: string;
 };
 
 export type FluidSettings = {
@@ -78,6 +84,8 @@ export type FluidSettings = {
   lightnessBase: number;
   lightnessGain: number;
   paletteMix: number;
+  paletteMode: 'auto' | 'manual';
+  manualPreset: string;
 };
 
 export interface VisualizerSettings {
@@ -146,6 +154,8 @@ const defaultSettings: VisualizerSettings = {
     saturation: 0.9,
     lightnessBase: 0.6,
     lightnessGain: 0.2,
+    paletteMode: 'auto',
+    manualPreset: DEFAULT_PARTICLE_PRESET,
   },
   fluid: {
     energyBoost: 1,
@@ -163,6 +173,8 @@ const defaultSettings: VisualizerSettings = {
     lightnessBase: 0.45,
     lightnessGain: 0.35,
     paletteMix: 0.4,
+    paletteMode: 'auto',
+    manualPreset: DEFAULT_FLUID_PRESET,
   },
 };
 
@@ -172,6 +184,15 @@ const clampNumber = (value: number, min: number, max: number) => {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
 };
+
+const PARTICLE_PRESET_SET = new Set(PARTICLE_COLOR_PRESETS.map((preset) => preset.id));
+const FLUID_PRESET_SET = new Set(FLUID_COLOR_PRESETS.map((preset) => preset.id));
+
+const normalizePaletteMode = (value: unknown): 'auto' | 'manual' =>
+  value === 'manual' ? 'manual' : 'auto';
+
+const normalizePreset = (value: unknown, fallback: string, valid: Set<string>) =>
+  typeof value === 'string' && valid.has(value) ? value : fallback;
 
 const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerSettings>): VisualizerSettings => ({
   torus: { ...base.torus, ...(overrides?.torus ?? {}) },
@@ -185,6 +206,12 @@ const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerS
     saturation: clampNumber(overrides?.particles?.saturation ?? base.particles.saturation, 0, 1),
     lightnessBase: clampNumber(overrides?.particles?.lightnessBase ?? base.particles.lightnessBase, 0, 1),
     lightnessGain: clampNumber(overrides?.particles?.lightnessGain ?? base.particles.lightnessGain, 0, 1),
+    paletteMode: normalizePaletteMode(overrides?.particles?.paletteMode),
+    manualPreset: normalizePreset(
+      overrides?.particles?.manualPreset,
+      base.particles.manualPreset,
+      PARTICLE_PRESET_SET,
+    ),
   },
   fluid: {
     ...base.fluid,
@@ -204,6 +231,8 @@ const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerS
     lightnessBase: clampNumber(overrides?.fluid?.lightnessBase ?? base.fluid.lightnessBase, 0, 1),
     lightnessGain: clampNumber(overrides?.fluid?.lightnessGain ?? base.fluid.lightnessGain, 0, 1),
     paletteMix: clampNumber(overrides?.fluid?.paletteMix ?? base.fluid.paletteMix, 0, 1),
+    paletteMode: normalizePaletteMode(overrides?.fluid?.paletteMode),
+    manualPreset: normalizePreset(overrides?.fluid?.manualPreset, base.fluid.manualPreset, FLUID_PRESET_SET),
   },
 });
 
@@ -211,7 +240,10 @@ export type VisualizerSection = keyof VisualizerSettings;
 
 interface VisualizerSettingsContextValue {
   settings: VisualizerSettings;
-  updateSettings: <Section extends VisualizerSection>(section: Section, values: Partial<VisualizerSettings[Section]>) => void;
+  updateSettings: <Section extends VisualizerSection>(
+    section: Section,
+    values: Partial<VisualizerSettings[Section]>,
+  ) => void;
   resetSection: (section: VisualizerSection) => void;
   resetAll: () => void;
   replaceSettings: (next: Partial<VisualizerSettings>) => void;

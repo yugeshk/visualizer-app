@@ -3,6 +3,7 @@
 import { useAudio } from '@/components/audio/AudioProvider';
 import { useBackground } from '@/components/background/BackgroundProvider';
 import { useVisualizerSettings } from '@/components/settings/VisualizerSettingsProvider';
+import { PARTICLE_PRESET_MAP } from '@/lib/palettes';
 import * as THREE from 'three';
 import { useEffect, useRef } from 'react';
 
@@ -28,6 +29,7 @@ const createCircleTexture = () => {
   texture.needsUpdate = true;
   return texture;
 };
+
 
 export const ParticlesScene: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -117,15 +119,23 @@ export const ParticlesScene: React.FC = () => {
       positions[index * 3 + 1] = 0;
       positions[index * 3 + 2] = 0;
 
-      const hueOffset = (Math.random() - 0.5) * particleSettings.hueRange;
-      const hue = THREE.MathUtils.euclideanModulo(particleSettings.hueBase + hueOffset, 1);
-      const saturation = THREE.MathUtils.clamp(particleSettings.saturation, 0, 1);
-      const lightness = THREE.MathUtils.clamp(
-        particleSettings.lightnessBase + energy * particleSettings.lightnessGain,
-        0,
-        1,
-      );
-      const color = new THREE.Color().setHSL(hue, saturation, lightness);
+      let color: THREE.Color;
+      if (particleSettings.paletteMode === 'manual') {
+        const presetHex = PARTICLE_PRESET_MAP[particleSettings.manualPreset] ?? 0xffffff;
+        const base = new THREE.Color(presetHex);
+        color = base.clone().lerp(new THREE.Color(1, 1, 1), energy * 0.35);
+      } else {
+        const hueOffset = (Math.random() - 0.5) * particleSettings.hueRange;
+        const hue = THREE.MathUtils.euclideanModulo(particleSettings.hueBase + hueOffset, 1);
+        const saturation = THREE.MathUtils.clamp(particleSettings.saturation, 0, 1);
+        const lightness = THREE.MathUtils.clamp(
+          particleSettings.lightnessBase + energy * particleSettings.lightnessGain,
+          0,
+          1,
+        );
+        color = new THREE.Color().setHSL(hue, saturation, lightness);
+      }
+
       colors[index * 3] = color.r;
       colors[index * 3 + 1] = color.g;
       colors[index * 3 + 2] = color.b;

@@ -4,6 +4,7 @@ import { useAudio } from '@/components/audio/AudioProvider';
 import { useBackground } from '@/components/background/BackgroundProvider';
 import { useVisualizerSettings } from '@/components/settings/VisualizerSettingsProvider';
 import { createFluidSimulation } from '@/lib/fluid/createFluidSimulation';
+import { FLUID_PRESET_MAP } from '@/lib/palettes';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 const average = (buffer: Uint8Array, start: number, end: number) => {
@@ -50,6 +51,8 @@ const hslToRgb = (h: number, s: number, l: number): [number, number, number] => 
   return [r + m, g + m, b + m].map(clamp01) as [number, number, number];
 };
 
+const DEFAULT_MANUAL_COLOR: [number, number, number] = [0.6, 0.6, 0.6];
+
 export const FluidFrame: React.FC = () => {
   const { backgroundUrl } = useBackground();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -60,8 +63,23 @@ export const FluidFrame: React.FC = () => {
   const { settings } = useVisualizerSettings();
   const fluidSettings = settings.fluid;
 
+  const manualColor = useMemo<[number, number, number] | null>(() => {
+    if (fluidSettings.paletteMode !== 'manual') return null;
+    return FLUID_PRESET_MAP[fluidSettings.manualPreset] ?? DEFAULT_MANUAL_COLOR;
+  }, [fluidSettings.manualPreset, fluidSettings.paletteMode]);
+
   const computeColor = useCallback(
     (bass: number, mids: number, highs: number, energy: number): [number, number, number] => {
+      if (fluidSettings.paletteMode === 'manual') {
+        const preset = manualColor ?? DEFAULT_MANUAL_COLOR;
+        const lightBoost = energy * 0.35;
+        return [
+          clamp01(preset[0] + lightBoost),
+          clamp01(preset[1] + lightBoost * 0.6),
+          clamp01(preset[2] + lightBoost * 0.4),
+        ];
+      }
+
       const hue = (fluidSettings.hueBase + highs * fluidSettings.hueRange) % 1;
       const saturation = clamp01(fluidSettings.saturation + energy * fluidSettings.saturationGain);
       const lightness = clamp01(fluidSettings.lightnessBase + energy * fluidSettings.lightnessGain);
@@ -80,7 +98,7 @@ export const FluidFrame: React.FC = () => {
         clamp01(palette[2] * (1 - mix) + reactive[2] * mix),
       ];
     },
-    [fluidSettings],
+    [fluidSettings, manualColor],
   );
 
   const baseColor = useMemo<[number, number, number]>(() => computeColor(0.2, 0.2, 0.2, 0), [computeColor]);
@@ -116,6 +134,17 @@ export const FluidFrame: React.FC = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    const simulation = simulationRef.current;
+    if (!simulation) return;
+
+    if (fluidSettings.paletteMode === 'manual' && manualColor) {
+      simulation.setPaletteOverride('manual', manualColor);
+    } else {
+      simulation.setPaletteOverride('auto');
+    }
+  }, [fluidSettings.paletteMode, manualColor]);
 
   useEffect(() => {
     if (!analyser || !fluidSettings.autoSplats) {
@@ -206,7 +235,7 @@ export const FluidFrame: React.FC = () => {
             Trigger Splats
           </button>
           <span className="opacity-75">
-            Sends {fluidSettings.manualSplatCount} splats using the current color mix.
+            Sends {fluidSettings.manualSplatCount} splats using the current colour mix.
           </span>
         </div>
       )}

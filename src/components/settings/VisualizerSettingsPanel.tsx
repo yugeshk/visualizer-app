@@ -3,24 +3,20 @@
 import { usePathname } from 'next/navigation';
 import React, { useMemo, useRef, useState } from 'react';
 import { useVisualizerSettings, VisualizerSection, VisualizerSettings } from './VisualizerSettingsProvider';
+import { fluidPresetOptions, paletteModeOptions, particlePresetOptions } from '@/lib/palettes';
 
 interface ControlDefinition<Section extends VisualizerSection> {
   key: keyof VisualizerSettings[Section];
   label: string;
-  min: number;
-  max: number;
+  min?: number;
+  max?: number;
   step?: number;
-  kind?: 'slider' | 'toggle';
-  description?: string;
-  displayMultiplier?: number;
-}
-
-type ControlMap<Section extends VisualizerSection> = {
-  section: Section;
-  title: string;
+  kind?: 'slider' | 'toggle' | 'select';
   description: string;
-  controls: ControlDefinition<Section>[];
-};
+  displayMultiplier?: number;
+  options?: { value: string; label: string }[];
+  disabled?: (settings: VisualizerSettings[Section]) => boolean;
+}
 
 const formatNumber = (value: number, step: number | undefined) => {
   if (!Number.isFinite(value)) return '0';
@@ -32,129 +28,91 @@ const formatNumber = (value: number, step: number | undefined) => {
   return value.toFixed(0);
 };
 
-const computePanelDefinition = (pathname: string): ControlMap<VisualizerSection> | null => {
-  if (pathname === '/torus') {
-    return {
-      section: 'torus',
-      title: 'Torus Response',
-      description: 'Adjust how the torus scales, rotates, and glows with the spectrum.',
-      controls: [
-        { key: 'lowScaleMultiplier', label: 'Low Frequency Scale', min: 0, max: 6, step: 0.1 },
-        { key: 'highScaleMultiplier', label: 'High Frequency Scale', min: 0, max: 6, step: 0.1 },
-        { key: 'depthScaleMultiplier', label: 'Depth Scale', min: 0, max: 5, step: 0.1 },
-        { key: 'scaleSmoothing', label: 'Scale Smoothing', min: 0.01, max: 0.3, step: 0.01 },
-        { key: 'baseRotation', label: 'Base Rotation Speed', min: 0, max: 0.05, step: 0.001 },
-        { key: 'rotationGain', label: 'Rotation Gain', min: 0, max: 0.1, step: 0.002 },
-        { key: 'emissiveBase', label: 'Emissive Base', min: 0, max: 1.5, step: 0.05 },
-        { key: 'emissiveGain', label: 'Emissive Gain', min: 0, max: 3, step: 0.1 },
-      ],
-    };
-  }
+const clampNumber = (value: number, min: number | undefined, max: number | undefined) => {
+  if (!Number.isFinite(value)) return min ?? 0;
+  let next = value;
+  if (max !== undefined) next = Math.min(next, max);
+  if (min !== undefined) next = Math.max(next, min);
+  return next;
+};
 
-  if (pathname.startsWith('/sphere')) {
-    return {
-      section: 'sphere',
-      title: 'Sphere Variants',
-      description: 'Control vertex displacement and lighting shared by Angel, Hedgehog, and Lotus modes.',
-      controls: [
-        { key: 'accentScale', label: 'Accent Vertex Strength', min: 0.5, max: 10, step: 0.1 },
-        { key: 'baseScale', label: 'Base Vertex Strength', min: 0.5, max: 6, step: 0.1 },
-        { key: 'smoothing', label: 'Vertex Smoothing', min: 0.02, max: 0.3, step: 0.01 },
-        { key: 'rotationBase', label: 'Base Rotation Speed', min: 0, max: 0.05, step: 0.001 },
-        { key: 'rotationGain', label: 'Rotation Gain', min: 0, max: 0.1, step: 0.002 },
-        { key: 'emissiveMin', label: 'Emissive Base', min: 0, max: 1.5, step: 0.05 },
-        { key: 'emissiveGain', label: 'Emissive Gain', min: 0, max: 3, step: 0.1 },
-        { key: 'fillLightBase', label: 'Fill Light Base', min: 0, max: 2, step: 0.05 },
-        { key: 'fillLightGain', label: 'Fill Light Gain', min: 0, max: 4, step: 0.1 },
-        { key: 'backLightBase', label: 'Back Light Base', min: 0, max: 2, step: 0.05 },
-        { key: 'backLightGain', label: 'Back Light Gain', min: 0, max: 4, step: 0.1 },
-        { key: 'backLightOrbitGain', label: 'Back Light Orbit Gain', min: 0, max: 4, step: 0.1 },
-      ],
-    };
-  }
-
-  if (pathname === '/terrain') {
-    return {
-      section: 'terrain',
-      title: 'Terrain Surface',
-      description: 'Shape the fractal surface and lighting response to different frequency ranges.',
-      controls: [
-        { key: 'waveWeight', label: 'Wave Weight', min: 0, max: 3, step: 0.05 },
-        { key: 'radialWeight', label: 'Radial Weight', min: 0, max: 3, step: 0.05 },
-        { key: 'waveformLowGain', label: 'Bass Height Gain', min: 0, max: 8, step: 0.1 },
-        { key: 'waveformMidGain', label: 'Mid Height Gain', min: 0, max: 6, step: 0.1 },
-        { key: 'heightMultiplier', label: 'Height Multiplier', min: 0, max: 6, step: 0.1 },
-        { key: 'smoothing', label: 'Height Smoothing', min: 0.02, max: 0.4, step: 0.01 },
-        { key: 'cameraOrbitSpeed', label: 'Camera Orbit Speed', min: 0, max: 1, step: 0.01 },
-        { key: 'sunIntensityBase', label: 'Sun Base Intensity', min: 0, max: 2, step: 0.05 },
-        { key: 'sunIntensityGain', label: 'Sun Intensity Gain', min: 0, max: 3, step: 0.1 },
-        { key: 'backlightBase', label: 'Backlight Base', min: 0, max: 2, step: 0.05 },
-        { key: 'backlightGain', label: 'Backlight Gain', min: 0, max: 4, step: 0.1 },
-      ],
-    };
-  }
-
+const computePanelDefinition = (
+  pathname: string,
+): ControlDefinition<VisualizerSection>[] | null => {
   if (pathname === '/particles') {
-    return {
-      section: 'particles',
-      title: 'Particle Field',
-      description: 'Tweak emission rate, lifetime, and motion of the additive particle cloud.',
-      controls: [
-        { key: 'spawnBase', label: 'Spawn Base', min: 0, max: 30, step: 1 },
-        { key: 'spawnMultiplier', label: 'Spawn Multiplier', min: 0, max: 120, step: 1 },
-        { key: 'speedBase', label: 'Base Speed', min: 0, max: 20, step: 0.5 },
-        { key: 'speedGain', label: 'Speed Gain', min: 0, max: 80, step: 1 },
-        { key: 'randomSpeedRange', label: 'Random Speed Range', min: 0, max: 20, step: 0.5 },
-        { key: 'sizeBase', label: 'Base Size', min: 1, max: 40, step: 1 },
-        { key: 'sizeGain', label: 'Size Gain', min: 0, max: 60, step: 1 },
-        { key: 'lifetimeBase', label: 'Lifetime Base', min: 0.5, max: 6, step: 0.1 },
-        { key: 'lifetimeVariance', label: 'Lifetime Variance', min: 0, max: 6, step: 0.1 },
-        { key: 'fadeDivider', label: 'Fade Divider', min: 0.5, max: 10, step: 0.1 },
-        { key: 'sizeDecay', label: 'Size Decay', min: 0.9, max: 1, step: 0.001 },
-        { key: 'rotationSpeed', label: 'Cloud Rotation Speed', min: -0.5, max: 0.5, step: 0.01 },
-        { key: 'hueBase', label: 'Hue Base', min: 0, max: 1, step: 0.01, description: 'Center hue (0-1) that the cloud orbits.' },
-        { key: 'hueRange', label: 'Hue Range', min: 0, max: 1, step: 0.01, description: 'How far hue can drift from the base value.' },
-        { key: 'saturation', label: 'Saturation', min: 0, max: 1, step: 0.01 },
-        { key: 'lightnessBase', label: 'Lightness Base', min: 0, max: 1, step: 0.01 },
-        { key: 'lightnessGain', label: 'Lightness Gain', min: 0, max: 1, step: 0.01, description: 'Extra lightness added when the track gets energetic.' },
-      ],
-    };
+    return [
+      { key: 'paletteMode', label: 'Colour Mode', kind: 'select', options: paletteModeOptions as unknown as { value: string; label: string }[], description: 'Switch between audio reactive colouring and manual presets.' },
+      { key: 'manualPreset', label: 'Manual Palette', kind: 'select', options: particlePresetOptions, description: 'Pick a preset when manual mode is active.', disabled: (settings) => settings.paletteMode !== 'manual' },
+      { key: 'spawnBase', label: 'Spawn Base', min: 0, max: 30, step: 1, description: 'Particles emitted each frame before audio influence.' },
+      { key: 'spawnMultiplier', label: 'Spawn Multiplier', min: 0, max: 120, step: 1, description: 'Extra particles fired as the track gets louder.' },
+      { key: 'speedBase', label: 'Base Speed', min: 0, max: 20, step: 0.5, description: 'Starting velocity applied to every particle.' },
+      { key: 'speedGain', label: 'Speed Gain', min: 0, max: 80, step: 1, description: 'Additional speed added from audio peaks.' },
+      { key: 'randomSpeedRange', label: 'Random Speed Range', min: 0, max: 20, step: 0.5, description: 'Random variation injected into particle velocity.' },
+      { key: 'sizeBase', label: 'Base Size', min: 1, max: 40, step: 1, description: 'Default particle size on spawn.' },
+      { key: 'sizeGain', label: 'Size Gain', min: 0, max: 60, step: 1, description: 'Size boost taken from analyser energy.' },
+      { key: 'lifetimeBase', label: 'Lifetime Base', min: 0.5, max: 6, step: 0.1, description: 'Average lifetime in seconds for each particle.' },
+      { key: 'lifetimeVariance', label: 'Lifetime Variance', min: 0, max: 6, step: 0.1, description: 'Random lifetime variation per particle.' },
+      { key: 'fadeDivider', label: 'Fade Divider', min: 0.5, max: 10, step: 0.1, description: 'Controls how quickly colours fade while particles age.' },
+      { key: 'sizeDecay', label: 'Size Decay', min: 0.9, max: 1, step: 0.001, description: 'Multiplier applied each frame to shrink particles.' },
+      { key: 'rotationSpeed', label: 'Cloud Rotation Speed', min: -0.5, max: 0.5, step: 0.01, description: 'Slow rotation rate for the entire particle system.' },
+      { key: 'hueBase', label: 'Hue Base', min: 0, max: 1, step: 0.01, description: 'Central hue used for automatic colouring.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'hueRange', label: 'Hue Range', min: 0, max: 1, step: 0.01, description: 'How far hue can drift around the base value.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'saturation', label: 'Saturation', min: 0, max: 1, step: 0.01, description: 'Baseline saturation applied to particles.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'lightnessBase', label: 'Lightness Base', min: 0, max: 1, step: 0.01, description: 'Baseline lightness for automatic colouring.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'lightnessGain', label: 'Lightness Gain', min: 0, max: 1, step: 0.01, description: 'Extra lightness added while the song peaks.', disabled: (settings) => settings.paletteMode === 'manual' },
+    ];
   }
 
   if (pathname === '/fluid') {
-    return {
-      section: 'fluid',
-      title: 'Fluid Injection',
-      description: 'Dial how audio energy maps to splat intensity and hue in the fluid canvas.',
-      controls: [
-        { key: 'energyBoost', label: 'Energy Boost', min: 0.1, max: 4, step: 0.1 },
-        { key: 'bassWeight', label: 'Bass Weight', min: 0, max: 1.5, step: 0.05 },
-        { key: 'midWeight', label: 'Mid Weight', min: 0, max: 1.5, step: 0.05 },
-        { key: 'highWeight', label: 'High Weight', min: 0, max: 1.5, step: 0.05 },
-        { key: 'colorBase', label: 'Color Base', min: 0, max: 1, step: 0.02 },
-        { key: 'colorGain', label: 'Color Gain', min: 0, max: 2, step: 0.05 },
-        { key: 'hueBase', label: 'Hue Base', min: 0, max: 1, step: 0.01 },
-        { key: 'hueRange', label: 'Hue Energy Range', min: 0, max: 1, step: 0.01, description: 'How much the hue shifts when energy spikes.' },
-        { key: 'saturation', label: 'Saturation', min: 0, max: 1, step: 0.01 },
-        { key: 'saturationGain', label: 'Saturation Gain', min: 0, max: 1, step: 0.01, description: 'Extra saturation applied based on energy.' },
-        { key: 'lightnessBase', label: 'Lightness Base', min: 0, max: 1, step: 0.01 },
-        { key: 'lightnessGain', label: 'Lightness Gain', min: 0, max: 1, step: 0.01 },
-        { key: 'paletteMix', label: 'Reactive Mix', min: 0, max: 1, step: 0.01, description: 'Blend between the palette hue and analyzer-driven RGB.' },
-        { key: 'autoSplats', label: 'Audio Reactive Mode', kind: 'toggle', description: 'Toggle between audio-driven splats and manual triggering.' },
-        { key: 'manualSplatCount', label: 'Manual Splat Count', min: 1, max: 80, step: 1 },
-      ],
-    };
+    return [
+      { key: 'paletteMode', label: 'Colour Mode', kind: 'select', options: paletteModeOptions as unknown as { value: string; label: string }[], description: 'Choose between audio reactive colouring and manual presets.' },
+      { key: 'manualPreset', label: 'Manual Palette', kind: 'select', options: fluidPresetOptions, description: 'Pick a palette when manual mode is active.', disabled: (settings) => settings.paletteMode !== 'manual' },
+      { key: 'energyBoost', label: 'Energy Boost', min: 0.1, max: 4, step: 0.1, description: 'Amplifies analyser energy before it drives the fluid.' },
+      { key: 'bassWeight', label: 'Bass Weight', min: 0, max: 1.5, step: 0.05, description: 'Relative importance of bass frequencies.' },
+      { key: 'midWeight', label: 'Mid Weight', min: 0, max: 1.5, step: 0.05, description: 'Relative importance of mid frequencies.' },
+      { key: 'highWeight', label: 'High Weight', min: 0, max: 1.5, step: 0.05, description: 'Relative importance of high frequencies.' },
+      { key: 'colorBase', label: 'RGB Base', min: 0, max: 1, step: 0.02, description: 'Baseline RGB value blended into the fluid.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'colorGain', label: 'RGB Gain', min: 0, max: 2, step: 0.05, description: 'RGB gain taken from analyser values.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'hueBase', label: 'Hue Base', min: 0, max: 1, step: 0.01, description: 'Primary hue for automatic colouring.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'hueRange', label: 'Hue Energy Range', min: 0, max: 1, step: 0.01, description: 'Amount of hue shift caused by higher frequencies.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'saturation', label: 'Saturation', min: 0, max: 1, step: 0.01, description: 'Baseline saturation for automatic mode.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'saturationGain', label: 'Saturation Gain', min: 0, max: 1, step: 0.01, description: 'Additional saturation applied from energy.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'lightnessBase', label: 'Lightness Base', min: 0, max: 1, step: 0.01, description: 'Baseline lightness value.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'lightnessGain', label: 'Lightness Gain', min: 0, max: 1, step: 0.01, description: 'Lightness boost supplied by the analyser.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'paletteMix', label: 'Reactive Mix', min: 0, max: 1, step: 0.01, description: 'Blend between palette colour and analyser RGB.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'autoSplats', label: 'Audio Reactive Splats', kind: 'toggle', description: 'Enable automatic splats driven by audio energy.' },
+      { key: 'manualSplatCount', label: 'Manual Splat Count', min: 1, max: 80, step: 1, description: 'Number of splats fired when you press Trigger.' },
+    ];
   }
 
   return null;
 };
 
+const resolveSectionKey = (path: string): VisualizerSection | null => {
+  if (path === '/particles') return 'particles';
+  if (path === '/fluid') return 'fluid';
+  if (path === '/torus') return 'torus';
+  if (path.startsWith('/sphere')) return 'sphere';
+  if (path === '/terrain') return 'terrain';
+  return null;
+};
+
 export const VisualizerSettingsPanel: React.FC = () => {
   const pathname = usePathname();
-  const config = useMemo(() => computePanelDefinition(pathname), [pathname]);
+  const sectionKey = useMemo(() => resolveSectionKey(pathname), [pathname]);
+  const controls = useMemo(() => (
+    sectionKey ? computePanelDefinition(pathname) : null
+  ), [pathname, sectionKey]);
+
   const { settings, updateSettings, resetSection, replaceSettings } = useVisualizerSettings();
   const [collapsed, setCollapsed] = useState(true);
+  const [infoKey, setInfoKey] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  if (!sectionKey || !controls) return null;
+
+  const sectionSettings = settings[sectionKey] as Record<string, unknown>;
+
   const handleExport = () => {
     try {
       const data = JSON.stringify(settings, null, 2);
@@ -186,75 +144,199 @@ export const VisualizerSettingsPanel: React.FC = () => {
     }
   };
 
+  const handleInfoToggle = (key: string) => {
+    setInfoKey((current) => (current === key ? null : key));
+  };
 
-  if (!config) return null;
-
-  const sectionSettings = settings[config.section];
-
-  const renderControl = (control: ControlDefinition<typeof config.section>) => {
-    const rawValue = sectionSettings[control.key as keyof typeof sectionSettings] as unknown;
-
-    if (control.kind === 'toggle') {
-      const checked = Boolean(rawValue);
-      return (
-        <label key={String(control.key)} className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-300">
-            <span>{control.label}</span>
-            <span className="font-mono text-slate-200">{checked ? 'On' : 'Off'}</span>
-          </div>
-          <input
-            type="checkbox"
-            className="h-4 w-8 cursor-pointer appearance-none rounded-full bg-slate-600 transition checked:bg-emerald-500"
-            checked={checked}
-            onChange={() =>
-              updateSettings(config.section, {
-                [control.key]: !checked,
-              } as Partial<VisualizerSettings[typeof config.section]>)
-            }
-          />
-          {control.description ? (
-            <p className="text-[11px] text-slate-500">{control.description}</p>
-          ) : null}
-        </label>
-      );
-    }
-
-    const value = Number(rawValue) || 0;
+  const renderSlider = (control: ControlDefinition<VisualizerSection>) => {
+    const controlKey = String(control.key);
+    const rawValue = Number(sectionSettings[controlKey]) || 0;
+    const value = clampNumber(rawValue, control.min, control.max);
     const displayValue = control.displayMultiplier ? value * control.displayMultiplier : value;
+    const isDisabled = control.disabled ? control.disabled(settings[sectionKey] as never) : false;
+
     return (
-      <div key={String(control.key)} className="space-y-1">
+      <div
+        key={controlKey}
+        className={`rounded-md border border-slate-800 bg-slate-900/60 p-3 shadow-sm ${isDisabled ? 'opacity-50' : ''}`}
+      >
         <div className="flex items-center justify-between text-xs text-slate-300">
-          <span>{control.label}</span>
-          <span className="font-mono text-slate-200">
-            {formatNumber(displayValue, control.step)}
+          <span className="flex items-center gap-2">
+            {control.label}
+            {control.description ? (
+              <button
+                type="button"
+                className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-500 text-[10px] text-slate-300 hover:border-blue-400 hover:text-blue-200"
+                onClick={() => handleInfoToggle(controlKey)}
+                aria-label={`About ${control.label}`}
+              >
+                ?
+              </button>
+            ) : null}
           </span>
+          <input
+            type="number"
+            className="w-20 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-right text-[11px] text-slate-100 focus:border-blue-500 focus:outline-none"
+            step={control.step ?? 0.1}
+            min={control.min}
+            max={control.max}
+            value={formatNumber(displayValue, control.step)}
+            onChange={(event) => {
+              if (isDisabled) return;
+              const next = Number(event.target.value);
+              if (Number.isNaN(next)) return;
+              const normalized = control.displayMultiplier ? next / control.displayMultiplier : next;
+              const clamped = clampNumber(normalized, control.min, control.max);
+              updateSettings(sectionKey, {
+                [control.key]: clamped,
+              } as Partial<VisualizerSettings[typeof sectionKey]>);
+            }}
+            disabled={isDisabled}
+          />
         </div>
         <input
-          className="w-full accent-blue-500"
+          className="mt-2 w-full accent-blue-500"
           type="range"
           min={control.min}
           max={control.max}
           step={control.step ?? 0.1}
           value={value}
-          onChange={(event) =>
-            updateSettings(config.section, {
-              [control.key]: Number.parseFloat(event.target.value),
-            } as Partial<VisualizerSettings[typeof config.section]>)
-          }
+          onChange={(event) => {
+            if (isDisabled) return;
+            const next = Number.parseFloat(event.target.value);
+            updateSettings(sectionKey, {
+              [control.key]: next,
+            } as Partial<VisualizerSettings[typeof sectionKey]>);
+          }}
+          disabled={isDisabled}
         />
-        {control.description ? (
-          <p className="text-[11px] text-slate-500">{control.description}</p>
+        {infoKey === controlKey && control.description ? (
+          <p className="mt-2 text-[11px] text-slate-400">{control.description}</p>
         ) : null}
       </div>
     );
   };
+
+  const renderToggle = (control: ControlDefinition<VisualizerSection>) => {
+    const controlKey = String(control.key);
+    const checked = Boolean(sectionSettings[controlKey]);
+    return (
+      <div
+        key={controlKey}
+        className="rounded-md border border-slate-800 bg-slate-900/60 p-3 shadow-sm"
+      >
+        <div className="flex items-center justify-between text-xs text-slate-300">
+          <span className="flex items-center gap-2">
+            {control.label}
+            {control.description ? (
+              <button
+                type="button"
+                className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-500 text-[10px] text-slate-300 hover:border-blue-400 hover:text-blue-200"
+                onClick={() => handleInfoToggle(controlKey)}
+                aria-label={`About ${control.label}`}
+              >
+                ?
+              </button>
+            ) : null}
+          </span>
+          <span className="font-mono text-slate-200">{checked ? 'On' : 'Off'}</span>
+        </div>
+        <label className="mt-3 inline-flex items-center gap-3">
+          <input
+            type="checkbox"
+            className="h-5 w-9 cursor-pointer appearance-none rounded-full border border-slate-600 bg-slate-700 transition checked:border-emerald-500 checked:bg-emerald-500"
+            checked={checked}
+            onChange={() =>
+              updateSettings(sectionKey, {
+                [control.key]: !checked,
+              } as Partial<VisualizerSettings[typeof sectionKey]>)
+            }
+          />
+          <span className="text-xs text-slate-300">Toggle</span>
+        </label>
+        {infoKey === controlKey && control.description ? (
+          <p className="mt-2 text-[11px] text-slate-400">{control.description}</p>
+        ) : null}
+      </div>
+    );
+  };
+
+  const renderSelect = (control: ControlDefinition<VisualizerSection>) => {
+    const controlKey = String(control.key);
+    const options = control.options ?? [];
+    const value = String(sectionSettings[controlKey] ?? options[0]?.value ?? '');
+    const isDisabled = control.disabled ? control.disabled(settings[sectionKey] as never) : false;
+    return (
+      <div
+        key={controlKey}
+        className={`rounded-md border border-slate-800 bg-slate-900/60 p-3 shadow-sm ${isDisabled ? 'opacity-50' : ''}`}
+      >
+        <div className="flex items-center justify-between text-xs text-slate-300">
+          <span className="flex items-center gap-2">
+            {control.label}
+            {control.description ? (
+              <button
+                type="button"
+                className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-500 text-[10px] text-slate-300 hover:border-blue-400 hover:text-blue-200"
+                onClick={() => handleInfoToggle(controlKey)}
+                aria-label={`About ${control.label}`}
+              >
+                ?
+              </button>
+            ) : null}
+          </span>
+        </div>
+        <select
+          className="mt-3 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+          value={value}
+          onChange={(event) => {
+            if (isDisabled) return;
+            updateSettings(sectionKey, {
+              [control.key]: event.target.value,
+            } as Partial<VisualizerSettings[typeof sectionKey]>);
+          }}
+          disabled={isDisabled}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {infoKey === controlKey && control.description ? (
+          <p className="mt-2 text-[11px] text-slate-400">{control.description}</p>
+        ) : null}
+      </div>
+    );
+  };
+
+  const renderControl = (control: ControlDefinition<VisualizerSection>) => {
+    if (control.kind === 'toggle') return renderToggle(control);
+    if (control.kind === 'select') return renderSelect(control);
+    return renderSlider(control);
+  };
+
+  const sliderControls = controls.filter((control) => (control.kind ?? 'slider') === 'slider');
+  const otherControls = controls.filter((control) => control.kind && control.kind !== 'slider');
+
+  const sectionTitle = pathname === '/particles'
+    ? 'Particle Field'
+    : pathname === '/fluid'
+      ? 'Fluid Injection'
+      : 'Settings';
+
+  const sectionDescription = pathname === '/particles'
+    ? 'Tweak emission, lifetime, palette, and motion of the particle cloud.'
+    : pathname === '/fluid'
+      ? 'Configure how audio energy maps to colour and motion in the fluid solver.'
+      : 'Fine-tune the current visualizer.';
 
   return (
     <aside className="rounded-lg border border-slate-800 bg-slate-900/70 p-4 shadow lg:sticky lg:top-28 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-blue-300">Settings</p>
-          <h3 className="text-sm font-semibold text-slate-100">{config.title}</h3>
+          <h3 className="text-sm font-semibold text-slate-100">{sectionTitle}</h3>
         </div>
         <button
           type="button"
@@ -264,9 +346,18 @@ export const VisualizerSettingsPanel: React.FC = () => {
           {collapsed ? 'Show' : 'Hide'}
         </button>
       </div>
-      <p className="mt-2 text-xs text-slate-400">{config.description}</p>
-      <div className={`mt-4 space-y-4 ${collapsed ? 'hidden lg:block' : 'block'}`}>
-        {config.controls.map(renderControl)}
+      <p className="mt-2 text-xs text-slate-400">{sectionDescription}</p>
+      <div className={`mt-4 flex flex-col gap-4 ${collapsed ? 'hidden lg:flex' : 'flex'}`}>
+        {sliderControls.length > 0 ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {sliderControls.map(renderControl)}
+          </div>
+        ) : null}
+        {otherControls.length > 0 ? (
+          <div className="grid gap-3">
+            {otherControls.map(renderControl)}
+          </div>
+        ) : null}
       </div>
       <input
         ref={importInputRef}
@@ -279,7 +370,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => resetSection(config.section)}
+            onClick={() => resetSection(sectionKey)}
             className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-300 transition hover:border-red-500 hover:text-red-200"
           >
             Reset Section

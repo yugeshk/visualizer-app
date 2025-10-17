@@ -100,6 +100,8 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
 
   let pointers = [];
   let splatStack = [];
+  let pointerColorOverride = null;
+
 
   const normalize01 = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 
@@ -141,6 +143,25 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
   const updateConfig = (partial) => {
       if (!partial) return;
       Object.assign(config, partial);
+  };
+
+  const setPaletteOverride = (mode, colorArray) => {
+      if (mode === 'manual' && Array.isArray(colorArray) && colorArray.length === 3) {
+          const candidate = toColorObject(colorArray);
+          const normalized = candidate || { r: 0.5, g: 0.5, b: 0.5 };
+          pointerColorOverride = {
+              r: clamp01(normalized.r) * 0.6,
+              g: clamp01(normalized.g) * 0.6,
+              b: clamp01(normalized.b) * 0.6,
+          };
+          config.COLORFUL = false;
+      } else {
+          pointerColorOverride = null;
+          config.COLORFUL = true;
+      }
+      pointers.forEach(p => {
+          p.color = generateColor();
+      });
   };
 
   pointers.push(new pointerPrototype());
@@ -1175,6 +1196,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
   }
 
   function updateColors (dt) {
+      if (pointerColorOverride) return;
       if (!config.COLORFUL) return;
 
       colorUpdateTimer += dt * config.COLOR_UPDATE_SPEED;
@@ -1582,6 +1604,13 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
   }
 
   function generateColor () {
+      if (pointerColorOverride) {
+          return {
+              r: pointerColorOverride.r,
+              g: pointerColorOverride.g,
+              b: pointerColorOverride.b,
+          };
+      }
       let c = HSVtoRGB(Math.random(), 1.0, 1.0);
       c.r *= 0.15;
       c.g *= 0.15;
@@ -1678,6 +1707,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
       injectAudioEnergy: queueAudioSplats,
       triggerManualSplats: queueManualSplats,
       updateConfig,
+      setPaletteOverride,
       setPaused: (value) => {
           config.PAUSED = Boolean(value);
       },
