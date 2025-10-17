@@ -24,7 +24,8 @@ SOFTWARE.
 
 /* eslint-disable */
 
-export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
+export const createFluidSimulation = (targetCanvas, userConfig) => {
+  const normalizedUserConfig = userConfig ?? {};
 
   /*
   MIT License
@@ -84,7 +85,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
       AUDIO_REACTIVITY: 1,
   }
 
-    Object.assign(config, userConfig ?? {});
+    Object.assign(config, normalizedUserConfig);
 
   function pointerPrototype () {
       this.id = -1;
