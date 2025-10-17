@@ -55,6 +55,11 @@ export type ParticlesSettings = {
   fadeDivider: number;
   sizeDecay: number;
   rotationSpeed: number;
+  hueBase: number;
+  hueRange: number;
+  saturation: number;
+  lightnessBase: number;
+  lightnessGain: number;
 };
 
 export type FluidSettings = {
@@ -66,6 +71,13 @@ export type FluidSettings = {
   colorGain: number;
   autoSplats: boolean;
   manualSplatCount: number;
+  hueBase: number;
+  hueRange: number;
+  saturation: number;
+  saturationGain: number;
+  lightnessBase: number;
+  lightnessGain: number;
+  paletteMix: number;
 };
 
 export interface VisualizerSettings {
@@ -129,6 +141,11 @@ const defaultSettings: VisualizerSettings = {
     fadeDivider: 3,
     sizeDecay: 0.995,
     rotationSpeed: 0.1,
+    hueBase: 0.55,
+    hueRange: 0.35,
+    saturation: 0.9,
+    lightnessBase: 0.6,
+    lightnessGain: 0.2,
   },
   fluid: {
     energyBoost: 1,
@@ -139,16 +156,36 @@ const defaultSettings: VisualizerSettings = {
     colorGain: 0.9,
     autoSplats: true,
     manualSplatCount: 12,
+    hueBase: 0.55,
+    hueRange: 0.3,
+    saturation: 0.85,
+    saturationGain: 0.15,
+    lightnessBase: 0.45,
+    lightnessGain: 0.35,
+    paletteMix: 0.4,
   },
 };
 
 const cloneDefaultSettings = (): VisualizerSettings => JSON.parse(JSON.stringify(defaultSettings));
 
+const clampNumber = (value: number, min: number, max: number) => {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
+};
+
 const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerSettings>): VisualizerSettings => ({
   torus: { ...base.torus, ...(overrides?.torus ?? {}) },
   sphere: { ...base.sphere, ...(overrides?.sphere ?? {}) },
   terrain: { ...base.terrain, ...(overrides?.terrain ?? {}) },
-  particles: { ...base.particles, ...(overrides?.particles ?? {}) },
+  particles: {
+    ...base.particles,
+    ...(overrides?.particles ?? {}),
+    hueBase: clampNumber(overrides?.particles?.hueBase ?? base.particles.hueBase, 0, 1),
+    hueRange: clampNumber(overrides?.particles?.hueRange ?? base.particles.hueRange, 0, 1.5),
+    saturation: clampNumber(overrides?.particles?.saturation ?? base.particles.saturation, 0, 1),
+    lightnessBase: clampNumber(overrides?.particles?.lightnessBase ?? base.particles.lightnessBase, 0, 1),
+    lightnessGain: clampNumber(overrides?.particles?.lightnessGain ?? base.particles.lightnessGain, 0, 1),
+  },
   fluid: {
     ...base.fluid,
     ...(overrides?.fluid ?? {}),
@@ -160,6 +197,13 @@ const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerS
       overrides?.fluid?.manualSplatCount === undefined
         ? base.fluid.manualSplatCount
         : Math.max(1, Number(overrides.fluid.manualSplatCount) || base.fluid.manualSplatCount),
+    hueBase: clampNumber(overrides?.fluid?.hueBase ?? base.fluid.hueBase, 0, 1),
+    hueRange: clampNumber(overrides?.fluid?.hueRange ?? base.fluid.hueRange, 0, 1),
+    saturation: clampNumber(overrides?.fluid?.saturation ?? base.fluid.saturation, 0, 1),
+    saturationGain: clampNumber(overrides?.fluid?.saturationGain ?? base.fluid.saturationGain, 0, 1),
+    lightnessBase: clampNumber(overrides?.fluid?.lightnessBase ?? base.fluid.lightnessBase, 0, 1),
+    lightnessGain: clampNumber(overrides?.fluid?.lightnessGain ?? base.fluid.lightnessGain, 0, 1),
+    paletteMix: clampNumber(overrides?.fluid?.paletteMix ?? base.fluid.paletteMix, 0, 1),
   },
 });
 

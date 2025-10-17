@@ -112,6 +112,11 @@ const computePanelDefinition = (pathname: string): ControlMap<VisualizerSection>
         { key: 'fadeDivider', label: 'Fade Divider', min: 0.5, max: 10, step: 0.1 },
         { key: 'sizeDecay', label: 'Size Decay', min: 0.9, max: 1, step: 0.001 },
         { key: 'rotationSpeed', label: 'Cloud Rotation Speed', min: -0.5, max: 0.5, step: 0.01 },
+        { key: 'hueBase', label: 'Hue Base', min: 0, max: 1, step: 0.01, description: 'Center hue (0-1) that the cloud orbits.' },
+        { key: 'hueRange', label: 'Hue Range', min: 0, max: 1, step: 0.01, description: 'How far hue can drift from the base value.' },
+        { key: 'saturation', label: 'Saturation', min: 0, max: 1, step: 0.01 },
+        { key: 'lightnessBase', label: 'Lightness Base', min: 0, max: 1, step: 0.01 },
+        { key: 'lightnessGain', label: 'Lightness Gain', min: 0, max: 1, step: 0.01, description: 'Extra lightness added when the track gets energetic.' },
       ],
     };
   }
@@ -120,7 +125,7 @@ const computePanelDefinition = (pathname: string): ControlMap<VisualizerSection>
     return {
       section: 'fluid',
       title: 'Fluid Injection',
-      description: 'Dial how audio energy maps to splat intensity and hue in the fluid iframe.',
+      description: 'Dial how audio energy maps to splat intensity and hue in the fluid canvas.',
       controls: [
         { key: 'energyBoost', label: 'Energy Boost', min: 0.1, max: 4, step: 0.1 },
         { key: 'bassWeight', label: 'Bass Weight', min: 0, max: 1.5, step: 0.05 },
@@ -128,6 +133,13 @@ const computePanelDefinition = (pathname: string): ControlMap<VisualizerSection>
         { key: 'highWeight', label: 'High Weight', min: 0, max: 1.5, step: 0.05 },
         { key: 'colorBase', label: 'Color Base', min: 0, max: 1, step: 0.02 },
         { key: 'colorGain', label: 'Color Gain', min: 0, max: 2, step: 0.05 },
+        { key: 'hueBase', label: 'Hue Base', min: 0, max: 1, step: 0.01 },
+        { key: 'hueRange', label: 'Hue Energy Range', min: 0, max: 1, step: 0.01, description: 'How much the hue shifts when energy spikes.' },
+        { key: 'saturation', label: 'Saturation', min: 0, max: 1, step: 0.01 },
+        { key: 'saturationGain', label: 'Saturation Gain', min: 0, max: 1, step: 0.01, description: 'Extra saturation applied based on energy.' },
+        { key: 'lightnessBase', label: 'Lightness Base', min: 0, max: 1, step: 0.01 },
+        { key: 'lightnessGain', label: 'Lightness Gain', min: 0, max: 1, step: 0.01 },
+        { key: 'paletteMix', label: 'Reactive Mix', min: 0, max: 1, step: 0.01, description: 'Blend between the palette hue and analyzer-driven RGB.' },
         { key: 'autoSplats', label: 'Audio Reactive Mode', kind: 'toggle', description: 'Toggle between audio-driven splats and manual triggering.' },
         { key: 'manualSplatCount', label: 'Manual Splat Count', min: 1, max: 80, step: 1 },
       ],

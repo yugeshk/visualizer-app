@@ -1,6 +1,7 @@
 'use client';
 
 import { useAudio } from '@/components/audio/AudioProvider';
+import { useBackground } from '@/components/background/BackgroundProvider';
 import { useVisualizerSettings } from '@/components/settings/VisualizerSettingsProvider';
 import * as THREE from 'three';
 import { useEffect, useRef } from 'react';
@@ -16,14 +17,7 @@ const createCircleTexture = () => {
   if (!context) {
     throw new Error('Unable to create 2d context for particle texture');
   }
-  const gradient = context.createRadialGradient(
-    size / 2,
-    size / 2,
-    0,
-    size / 2,
-    size / 2,
-    size / 2,
-  );
+  const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   gradient.addColorStop(0, 'rgba(255,255,255,0.9)');
   gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
   gradient.addColorStop(1, 'rgba(255,255,255,0)');
@@ -37,6 +31,7 @@ const createCircleTexture = () => {
 
 export const ParticlesScene: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const { backgroundUrl } = useBackground();
   const { analyser, getFrequencyData } = useAudio();
   const { settings } = useVisualizerSettings();
   const particleSettings = settings.particles;
@@ -48,15 +43,18 @@ export const ParticlesScene: React.FC = () => {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setClearColor(0x000000, 0);
+    Object.assign(renderer.domElement.style, {
+      position: 'relative',
+      zIndex: '1',
+      display: 'block',
+      width: '100%',
+      height: '100%',
+    });
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      55,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      1000,
-    );
+    const camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.set(0, 0, 40);
 
     const positions = new Float32Array(PARTICLE_COUNT * 3);
@@ -107,7 +105,10 @@ export const ParticlesScene: React.FC = () => {
         Math.random() * 2 - 1,
         Math.random() * 2 - 1,
       ).normalize();
-      const speed = particleSettings.speedBase + energy * particleSettings.speedGain + Math.random() * particleSettings.randomSpeedRange;
+      const speed =
+        particleSettings.speedBase +
+        energy * particleSettings.speedGain +
+        Math.random() * particleSettings.randomSpeedRange;
       velocities[index * 3] = direction.x * speed;
       velocities[index * 3 + 1] = direction.y * speed;
       velocities[index * 3 + 2] = direction.z * speed;
@@ -116,8 +117,15 @@ export const ParticlesScene: React.FC = () => {
       positions[index * 3 + 1] = 0;
       positions[index * 3 + 2] = 0;
 
-      const hue = 0.55 - energy * 0.35 + Math.random() * 0.05;
-      const color = new THREE.Color().setHSL(hue, 0.9, 0.6 + energy * 0.2);
+      const hueOffset = (Math.random() - 0.5) * particleSettings.hueRange;
+      const hue = THREE.MathUtils.euclideanModulo(particleSettings.hueBase + hueOffset, 1);
+      const saturation = THREE.MathUtils.clamp(particleSettings.saturation, 0, 1);
+      const lightness = THREE.MathUtils.clamp(
+        particleSettings.lightnessBase + energy * particleSettings.lightnessGain,
+        0,
+        1,
+      );
+      const color = new THREE.Color().setHSL(hue, saturation, lightness);
       colors[index * 3] = color.r;
       colors[index * 3 + 1] = color.g;
       colors[index * 3 + 2] = color.b;
@@ -148,7 +156,7 @@ export const ParticlesScene: React.FC = () => {
       animationFrame = window.requestAnimationFrame(renderFrame);
       const delta = clock.getDelta();
 
-      let energy = 0.1;
+      let energy = 0.05;
       if (analyser) {
         getFrequencyData(spectrum);
         let sum = 0;
@@ -213,15 +221,29 @@ export const ParticlesScene: React.FC = () => {
       material.dispose();
       renderer.dispose();
       texture.dispose();
-      container.removeChild(renderer.domElement);
+      if (renderer.domElement.parentElement === container) {
+        container.removeChild(renderer.domElement);
+      }
     };
   }, [analyser, getFrequencyData, particleSettings]);
 
+  const surfaceStyle = backgroundUrl
+    ? {
+        backgroundImage: `url(${backgroundUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    : undefined;
+
   return (
     <div
-      ref={containerRef}
-      className="relative aspect-[16/9] w-full min-h-[26rem] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/80"
-    />
+      className="relative aspect-[16/9] w-full min-h-[26rem] overflow-hidden rounded-2xl border border-slate-800 shadow-lg"
+      style={surfaceStyle}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/35" />
+      <div ref={containerRef} className="relative h-full w-full" />
+    </div>
   );
 };
 

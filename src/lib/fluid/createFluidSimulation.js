@@ -131,7 +131,9 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
 
   const queueAudioSplats = (energy, color) => {
       const strength = normalize01(energy);
-      const amount = Math.max(1, Math.min(60, Math.round(strength * 45)));
+      if (strength <= 0.001) return;
+      const amount = Math.min(120, Math.round(strength * 60));
+      if (amount <= 0) return;
       const colorObject = toColorObject(color);
       splatStack.push({ count: amount, color: colorObject, strength });
   };

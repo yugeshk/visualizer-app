@@ -1,9 +1,10 @@
 'use client';
 
 import { useAudio } from '@/components/audio/AudioProvider';
+import { useBackground } from '@/components/background/BackgroundProvider';
 import { useVisualizerSettings } from '@/components/settings/VisualizerSettingsProvider';
 import { createFluidSimulation } from '@/lib/fluid/createFluidSimulation';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 const average = (buffer: Uint8Array, start: number, end: number) => {
   if (end <= start) return 0;
@@ -16,7 +17,41 @@ const average = (buffer: Uint8Array, start: number, end: number) => {
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
+const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+  const hue = (h % 1 + 1) % 1;
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const hPrime = hue * 6;
+  const x = chroma * (1 - Math.abs((hPrime % 2) - 1));
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (hPrime >= 0 && hPrime < 1) {
+    r = chroma;
+    g = x;
+  } else if (hPrime >= 1 && hPrime < 2) {
+    r = x;
+    g = chroma;
+  } else if (hPrime >= 2 && hPrime < 3) {
+    g = chroma;
+    b = x;
+  } else if (hPrime >= 3 && hPrime < 4) {
+    g = x;
+    b = chroma;
+  } else if (hPrime >= 4 && hPrime < 5) {
+    r = x;
+    b = chroma;
+  } else {
+    r = chroma;
+    b = x;
+  }
+
+  const m = l - chroma / 2;
+  return [r + m, g + m, b + m].map(clamp01) as [number, number, number];
+};
+
 export const FluidFrame: React.FC = () => {
+  const { backgroundUrl } = useBackground();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const simulationRef = useRef<ReturnType<typeof createFluidSimulation> | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -25,11 +60,30 @@ export const FluidFrame: React.FC = () => {
   const { settings } = useVisualizerSettings();
   const fluidSettings = settings.fluid;
 
-  const baseColor = useMemo<[number, number, number]>(() => {
-    const base = clamp01(fluidSettings.colorBase);
-    const gain = clamp01(fluidSettings.colorGain);
-    return [base + gain * 0.3, base + gain * 0.2, base + gain * 0.1].map(clamp01) as [number, number, number];
-  }, [fluidSettings.colorBase, fluidSettings.colorGain]);
+  const computeColor = useCallback(
+    (bass: number, mids: number, highs: number, energy: number): [number, number, number] => {
+      const hue = (fluidSettings.hueBase + highs * fluidSettings.hueRange) % 1;
+      const saturation = clamp01(fluidSettings.saturation + energy * fluidSettings.saturationGain);
+      const lightness = clamp01(fluidSettings.lightnessBase + energy * fluidSettings.lightnessGain);
+      const palette = hslToRgb(hue, saturation, lightness);
+
+      const reactive: [number, number, number] = [
+        clamp01(fluidSettings.colorBase + highs * fluidSettings.colorGain),
+        clamp01(fluidSettings.colorBase + mids * fluidSettings.colorGain),
+        clamp01(fluidSettings.colorBase + bass * fluidSettings.colorGain),
+      ];
+
+      const mix = clamp01(fluidSettings.paletteMix);
+      return [
+        clamp01(palette[0] * (1 - mix) + reactive[0] * mix),
+        clamp01(palette[1] * (1 - mix) + reactive[1] * mix),
+        clamp01(palette[2] * (1 - mix) + reactive[2] * mix),
+      ];
+    },
+    [fluidSettings],
+  );
+
+  const baseColor = useMemo<[number, number, number]>(() => computeColor(0.2, 0.2, 0.2, 0), [computeColor]);
 
   useEffect(() => {
     lastColorRef.current = baseColor;
@@ -38,6 +92,9 @@ export const FluidFrame: React.FC = () => {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    canvas.style.backgroundColor = 'transparent';
+    canvas.style.display = 'block';
 
     try {
       const simulation = createFluidSimulation(canvas);
@@ -69,14 +126,11 @@ export const FluidFrame: React.FC = () => {
       return;
     }
 
-    const simulation = simulationRef.current;
-    if (!simulation) return;
-
     const spectrum = new Uint8Array(analyser.frequencyBinCount);
 
     const loop = () => {
-      const activeSimulation = simulationRef.current;
-      if (!activeSimulation) return;
+      const simulation = simulationRef.current;
+      if (!simulation) return;
 
       getFrequencyData(spectrum);
       const lowEnd = Math.floor(spectrum.length * 0.18);
@@ -91,14 +145,10 @@ export const FluidFrame: React.FC = () => {
         weightSum;
       const energy = clamp01(weightedEnergy * fluidSettings.energyBoost);
 
-      const color: [number, number, number] = [
-        clamp01(fluidSettings.colorBase + highs * fluidSettings.colorGain),
-        clamp01(fluidSettings.colorBase + mids * fluidSettings.colorGain),
-        clamp01(fluidSettings.colorBase + bass * fluidSettings.colorGain),
-      ];
+      const color = computeColor(bass, mids, highs, energy);
       lastColorRef.current = color;
 
-      activeSimulation.injectAudioEnergy(energy, color);
+      simulation.injectAudioEnergy(energy, color);
 
       animationRef.current = window.requestAnimationFrame(loop);
     };
@@ -111,7 +161,7 @@ export const FluidFrame: React.FC = () => {
         animationRef.current = null;
       }
     };
-  }, [analyser, fluidSettings.autoSplats, fluidSettings.bassWeight, fluidSettings.energyBoost, fluidSettings.highWeight, fluidSettings.midWeight, fluidSettings.colorBase, fluidSettings.colorGain, getFrequencyData]);
+  }, [analyser, computeColor, fluidSettings.autoSplats, fluidSettings.bassWeight, fluidSettings.energyBoost, fluidSettings.highWeight, fluidSettings.midWeight, getFrequencyData]);
 
   const handleManualSplat = () => {
     try {
@@ -124,12 +174,28 @@ export const FluidFrame: React.FC = () => {
     }
   };
 
+  const surfaceStyle = backgroundUrl
+    ? {
+        backgroundImage: `url(${backgroundUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    : undefined;
+
   return (
     <div className="space-y-3">
-      <canvas
-        ref={canvasRef}
-        className="h-[32rem] w-full overflow-hidden rounded-2xl border border-slate-800 shadow-lg"
-      />
+      <div
+        className="relative overflow-hidden rounded-2xl border border-slate-800 shadow-lg"
+        style={surfaceStyle}
+      >
+        <div className="pointer-events-none absolute inset-0 bg-slate-950/40" />
+        <canvas
+          ref={canvasRef}
+          className="relative z-10 block h-[32rem] w-full"
+          style={{ mixBlendMode: 'screen' }}
+        />
+      </div>
       {!fluidSettings.autoSplats && (
         <div className="flex flex-wrap items-center gap-3 text-sm text-slate-200">
           <button

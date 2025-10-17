@@ -9,11 +9,6 @@ import { useBackground } from '../background/BackgroundProvider';
 
 const links = [
   { href: '/', label: 'Overview' },
-  { href: '/torus', label: 'Torus' },
-  { href: '/sphere/angels', label: 'Angels' },
-  { href: '/sphere/hedgehog', label: 'Hedgehog' },
-  { href: '/sphere/lotus', label: 'Lotus' },
-  { href: '/terrain', label: 'Terrain' },
   { href: '/particles', label: 'Particles' },
   { href: '/fluid', label: 'Fluid' },
 ];
@@ -32,7 +27,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   return (
     <div className="min-h-screen" style={backgroundStyle}>
-      <div className="flex min-h-screen flex-col bg-slate-950/85 text-slate-100 backdrop-blur-sm">
+      <div className="flex min-h-screen flex-col bg-slate-950/60 text-slate-100 backdrop-blur-sm">
         <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
