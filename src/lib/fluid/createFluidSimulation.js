@@ -81,6 +81,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
       SUNRAYS: true,
       SUNRAYS_RESOLUTION: 196,
       SUNRAYS_WEIGHT: 1.0,
+      AUDIO_REACTIVITY: 1,
   }
 
     Object.assign(config, userConfig ?? {});
@@ -105,6 +106,10 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
 
 
   const normalize01 = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+  const clampAudioReactivity = (value) => {
+      if (!Number.isFinite(value)) return 1;
+      return Math.min(4, Math.max(0.05, value));
+  };
 
   const toColorObject = (value) => {
       if (!value) return null;
@@ -129,7 +134,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
       const numericCount = Number(count);
       const amount = Math.max(1, Math.min(120, Number.isFinite(numericCount) ? Math.round(numericCount) : 1));
       const colorObject = toColorObject(color);
-      splatStack.push({ count: amount, color: colorObject, strength: 1 });
+      splatStack.push({ count: amount, color: colorObject, strength: 1, manual: true });
   };
 
   const queueAudioSplats = (energy, color) => {
@@ -168,6 +173,11 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
           const velocity = Number(next.VELOCITY_DISSIPATION);
           if (Number.isFinite(velocity)) config.VELOCITY_DISSIPATION = velocity;
           delete next.VELOCITY_DISSIPATION;
+      }
+      if (next.AUDIO_REACTIVITY !== undefined) {
+          const reactivity = Number(next.AUDIO_REACTIVITY);
+          if (Number.isFinite(reactivity)) config.AUDIO_REACTIVITY = clampAudioReactivity(reactivity);
+          delete next.AUDIO_REACTIVITY;
       }
 
       Object.assign(config, next);
@@ -1447,13 +1457,18 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
   function multipleSplats (request) {
       if (request == null) return;
 
-      const spawn = (count, color, strength) => {
+      const spawn = (count, color, strength, manual) => {
           const amount = Math.max(1, Math.min(240, Math.round(count)));
           const energy = normalize01(strength);
-          const intensity = 4 + energy * 16;
-          const velocityScale = 400 + energy * 900;
+          const reactivity = clampAudioReactivity(config.AUDIO_REACTIVITY);
+          const amountFactor = manual ? 1 : reactivity;
+          const intensityScale = manual ? 1 : reactivity;
+          const velocityScaleBase = manual ? 1 : reactivity;
+          const intensity = (4 + energy * 16) * intensityScale;
+          const velocityScale = (400 + energy * 900) * velocityScaleBase;
+          const scaledAmount = Math.max(1, Math.min(240, Math.round(amount * amountFactor)));
 
-          for (let i = 0; i < amount; i++) {
+          for (let i = 0; i < scaledAmount; i++) {
               const base = color ?? generateColor();
               const tint = {
                   r: base.r * intensity,
@@ -1471,7 +1486,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
       };
 
       if (typeof request === 'number') {
-          spawn(request, null, 1);
+          spawn(request, null, 1, false);
           return;
       }
 
@@ -1479,7 +1494,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
           const color = request.color ? toColorObject(request.color) : null;
           const count = Number(request.count);
           const strength = request.strength;
-          spawn(Number.isFinite(count) ? count : 1, color ?? null, strength ?? 1);
+          spawn(Number.isFinite(count) ? count : 1, color ?? null, strength ?? 1, Boolean(request.manual));
       }
   }
 

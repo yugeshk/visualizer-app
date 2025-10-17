@@ -71,6 +71,7 @@ export type ParticlesSettings = {
 
 export type FluidSettings = {
   energyBoost: number;
+  audioReactivity: number;
   bassWeight: number;
   midWeight: number;
   highWeight: number;
@@ -167,6 +168,7 @@ const defaultSettings: VisualizerSettings = {
   },
   fluid: {
     energyBoost: 1,
+    audioReactivity: 1,
     bassWeight: 0.6,
     midWeight: 0.3,
     highWeight: 0.2,
@@ -245,6 +247,7 @@ const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerS
     manualPreset: normalizePreset(overrides?.fluid?.manualPreset, base.fluid.manualPreset, FLUID_PRESET_SET),
     manualLightBoost: clampNumber(overrides?.fluid?.manualLightBoost ?? base.fluid.manualLightBoost, 0, 1),
     energyFloor: clampNumber(overrides?.fluid?.energyFloor ?? base.fluid.energyFloor, 0, 0.2),
+    audioReactivity: clampNumber(overrides?.fluid?.audioReactivity ?? base.fluid.audioReactivity, 0.05, 4),
     splatForce: clampNumber(overrides?.fluid?.splatForce ?? base.fluid.splatForce, 500, 15000),
     splatRadius: clampNumber(overrides?.fluid?.splatRadius ?? base.fluid.splatRadius, 0.05, 1),
     densityDissipation: clampNumber(overrides?.fluid?.densityDissipation ?? base.fluid.densityDissipation, 0.1, 5),

@@ -69,6 +69,7 @@ const computePanelDefinition = (
       { key: 'paletteMode', label: 'Colour Mode', kind: 'select', options: paletteModeOptions as unknown as { value: string; label: string }[], description: 'Choose between audio reactive colouring and manual presets.' },
       { key: 'manualPreset', label: 'Manual Palette', kind: 'select', options: fluidPresetOptions, description: 'Pick a palette when manual mode is active.', disabled: (settings) => settings.paletteMode !== 'manual' },
       { key: 'energyBoost', label: 'Energy Boost', min: 0.1, max: 4, step: 0.1, description: 'Amplifies analyser energy before it drives the fluid.' },
+      { key: 'audioReactivity', label: 'Audio Reactivity', min: 0.05, max: 3, step: 0.05, description: 'Scales the amount, speed, and brightness of audio-driven splats.' },
       { key: 'bassWeight', label: 'Bass Weight', min: 0, max: 1.5, step: 0.05, description: 'Relative importance of bass frequencies.' },
       { key: 'midWeight', label: 'Mid Weight', min: 0, max: 1.5, step: 0.05, description: 'Relative importance of mid frequencies.' },
       { key: 'highWeight', label: 'High Weight', min: 0, max: 1.5, step: 0.05, description: 'Relative importance of high frequencies.' },

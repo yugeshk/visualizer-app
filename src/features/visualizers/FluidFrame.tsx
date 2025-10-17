@@ -165,8 +165,10 @@ export const FluidFrame: React.FC = () => {
       DENSITY_DISSIPATION: fluidSettings.densityDissipation,
       VELOCITY_DISSIPATION: fluidSettings.velocityDissipation,
       AUDIO_ENERGY_FLOOR: fluidSettings.energyFloor,
+      AUDIO_REACTIVITY: fluidSettings.audioReactivity,
     });
   }, [
+    fluidSettings.audioReactivity,
     fluidSettings.splatForce,
     fluidSettings.splatRadius,
     fluidSettings.densityDissipation,
