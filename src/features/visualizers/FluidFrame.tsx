@@ -5,7 +5,7 @@ import { useBackground } from '@/components/background/BackgroundProvider';
 import { useVisualizerSettings } from '@/components/settings/VisualizerSettingsProvider';
 import { createFluidSimulation } from '@/lib/fluid/createFluidSimulation';
 import { FLUID_PRESET_MAP } from '@/lib/palettes';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from 'react';
 
 const average = (buffer: Uint8Array, start: number, end: number) => {
   if (end <= start) return 0;
@@ -54,7 +54,7 @@ const hslToRgb = (h: number, s: number, l: number): [number, number, number] => 
 const DEFAULT_MANUAL_COLOR: [number, number, number] = [0.6, 0.6, 0.6];
 
 export const FluidFrame: React.FC = () => {
-  const { backgroundUrl } = useBackground();
+  const { backgroundUrl, backgroundSize } = useBackground();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const simulationRef = useRef<ReturnType<typeof createFluidSimulation> | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -72,7 +72,7 @@ export const FluidFrame: React.FC = () => {
     (bass: number, mids: number, highs: number, energy: number): [number, number, number] => {
       if (fluidSettings.paletteMode === 'manual') {
         const preset = manualColor ?? DEFAULT_MANUAL_COLOR;
-        const lightBoost = energy * 0.35;
+        const lightBoost = energy * fluidSettings.manualLightBoost;
         return [
           clamp01(preset[0] + lightBoost),
           clamp01(preset[1] + lightBoost * 0.6),
@@ -102,6 +102,15 @@ export const FluidFrame: React.FC = () => {
   );
 
   const baseColor = useMemo<[number, number, number]>(() => computeColor(0.2, 0.2, 0.2, 0), [computeColor]);
+
+  const aspectRatioStyle = useMemo<CSSProperties>(() => {
+    if (!backgroundSize || backgroundSize.height === 0) {
+      return { aspectRatio: '16 / 9' };
+    }
+    return {
+      aspectRatio: `${backgroundSize.width} / ${backgroundSize.height}`,
+    };
+  }, [backgroundSize]);
 
   useEffect(() => {
     lastColorRef.current = baseColor;
@@ -139,12 +148,31 @@ export const FluidFrame: React.FC = () => {
     const simulation = simulationRef.current;
     if (!simulation) return;
 
-    if (fluidSettings.paletteMode === 'manual' && manualColor) {
-      simulation.setPaletteOverride('manual', manualColor);
+    if (fluidSettings.paletteMode === 'manual') {
+      simulation.setPaletteOverride('manual', manualColor ?? DEFAULT_MANUAL_COLOR);
     } else {
       simulation.setPaletteOverride('auto');
     }
   }, [fluidSettings.paletteMode, manualColor]);
+
+  useEffect(() => {
+    const simulation = simulationRef.current;
+    if (!simulation) return;
+
+    simulation.updateConfig({
+      SPLAT_FORCE: fluidSettings.splatForce,
+      SPLAT_RADIUS: fluidSettings.splatRadius,
+      DENSITY_DISSIPATION: fluidSettings.densityDissipation,
+      VELOCITY_DISSIPATION: fluidSettings.velocityDissipation,
+      AUDIO_ENERGY_FLOOR: fluidSettings.energyFloor,
+    });
+  }, [
+    fluidSettings.splatForce,
+    fluidSettings.splatRadius,
+    fluidSettings.densityDissipation,
+    fluidSettings.velocityDissipation,
+    fluidSettings.energyFloor,
+  ]);
 
   useEffect(() => {
     if (!analyser || !fluidSettings.autoSplats) {
@@ -203,25 +231,31 @@ export const FluidFrame: React.FC = () => {
     }
   };
 
-  const surfaceStyle = backgroundUrl
-    ? {
-        backgroundImage: `url(${backgroundUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      }
-    : undefined;
+  const surfaceStyle = useMemo<CSSProperties>(() => {
+    const base: CSSProperties = backgroundUrl
+      ? {
+          backgroundImage: `url(${backgroundUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }
+      : {
+          backgroundColor: '#020617',
+        };
+    return {
+      ...base,
+      ...aspectRatioStyle,
+      minHeight: '26rem',
+    };
+  }, [aspectRatioStyle, backgroundUrl]);
 
   return (
     <div className="space-y-3">
-      <div
-        className="relative overflow-hidden rounded-2xl border border-slate-800 shadow-lg"
-        style={surfaceStyle}
-      >
-        <div className="pointer-events-none absolute inset-0 bg-slate-950/40" />
+      <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 shadow-lg" style={surfaceStyle}>
+        {backgroundUrl ? <div className="pointer-events-none absolute inset-0 bg-slate-950/40" /> : null}
         <canvas
           ref={canvasRef}
-          className="relative z-10 block h-[32rem] w-full"
+          className="relative z-10 block h-full w-full"
           style={{ mixBlendMode: 'screen' }}
         />
       </div>

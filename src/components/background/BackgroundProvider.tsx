@@ -8,9 +8,15 @@ import {
   StoredBinary,
 } from '@/lib/storage/mediaStore';
 
+interface BackgroundDimensions {
+  width: number;
+  height: number;
+}
+
 interface BackgroundContextValue {
   backgroundUrl: string | null;
   backgroundName: string | null;
+  backgroundSize: BackgroundDimensions | null;
   isReady: boolean;
   loadBackground: (file: File) => Promise<void>;
   clearBackground: () => Promise<void>;
@@ -23,9 +29,20 @@ const createObjectUrl = (record: StoredBinary): string => {
   return URL.createObjectURL(blob);
 };
 
+const resolveImageSize = (url: string): Promise<BackgroundDimensions | null> =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({ width: img.naturalWidth || 0, height: img.naturalHeight || 0 });
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+
 export const BackgroundProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const [backgroundName, setBackgroundName] = useState<string | null>(null);
+  const [backgroundSize, setBackgroundSize] = useState<BackgroundDimensions | null>(null);
   const [isReady, setIsReady] = useState(false);
   const objectUrlRef = useRef<string | null>(null);
 
@@ -44,6 +61,8 @@ export const BackgroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         objectUrlRef.current = url;
         setBackgroundUrl(url);
         setBackgroundName(stored.name);
+        const size = await resolveImageSize(url);
+        setBackgroundSize(size);
       } catch (error) {
         console.warn('Unable to restore background image', error);
       } finally {
@@ -72,6 +91,7 @@ export const BackgroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       objectUrlRef.current = url;
       setBackgroundUrl(url);
       setBackgroundName(file.name);
+      setBackgroundSize(await resolveImageSize(url));
       await storeBackgroundImage(file);
     } catch (error) {
       console.warn('Unable to load background image', error);
@@ -85,12 +105,13 @@ export const BackgroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     setBackgroundUrl(null);
     setBackgroundName(null);
+    setBackgroundSize(null);
     await clearStoredBackground();
   }, []);
 
   const value = useMemo<BackgroundContextValue>(
-    () => ({ backgroundUrl, backgroundName, isReady, loadBackground, clearBackground }),
-    [backgroundUrl, backgroundName, clearBackground, isReady, loadBackground],
+    () => ({ backgroundUrl, backgroundName, backgroundSize, isReady, loadBackground, clearBackground }),
+    [backgroundName, backgroundSize, backgroundUrl, clearBackground, isReady, loadBackground],
   );
 
   return <BackgroundContext.Provider value={value}>{children}</BackgroundContext.Provider>;

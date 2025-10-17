@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import React from 'react';
 import { AudioControls } from '../audio/AudioControls';
 import { VisualizerSettingsPanel } from '../settings/VisualizerSettingsPanel';
-import { useBackground } from '../background/BackgroundProvider';
 
 const links = [
   { href: '/', label: 'Overview' },
@@ -15,19 +14,10 @@ const links = [
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
-  const { backgroundUrl } = useBackground();
-  const backgroundStyle = backgroundUrl
-    ? {
-        backgroundImage: `url(${backgroundUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed',
-      }
-    : undefined;
 
   return (
-    <div className="min-h-screen" style={backgroundStyle}>
-      <div className="flex min-h-screen flex-col bg-slate-950/60 text-slate-100 backdrop-blur-sm">
+    <div className="min-h-screen bg-slate-950">
+      <div className="flex min-h-screen flex-col bg-slate-950/70 text-slate-100 backdrop-blur-sm">
         <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
             <div className="flex flex-wrap items-baseline justify-between gap-3">

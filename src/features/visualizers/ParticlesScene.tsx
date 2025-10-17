@@ -5,7 +5,7 @@ import { useBackground } from '@/components/background/BackgroundProvider';
 import { useVisualizerSettings } from '@/components/settings/VisualizerSettingsProvider';
 import { PARTICLE_PRESET_MAP } from '@/lib/palettes';
 import * as THREE from 'three';
-import { useEffect, useRef } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef } from 'react';
 
 const PARTICLE_COUNT = 6000;
 
@@ -33,7 +33,7 @@ const createCircleTexture = () => {
 
 export const ParticlesScene: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { backgroundUrl } = useBackground();
+  const { backgroundUrl, backgroundSize } = useBackground();
   const { analyser, getFrequencyData } = useAudio();
   const { settings } = useVisualizerSettings();
   const particleSettings = settings.particles;
@@ -123,7 +123,7 @@ export const ParticlesScene: React.FC = () => {
       if (particleSettings.paletteMode === 'manual') {
         const presetHex = PARTICLE_PRESET_MAP[particleSettings.manualPreset] ?? 0xffffff;
         const base = new THREE.Color(presetHex);
-        color = base.clone().lerp(new THREE.Color(1, 1, 1), energy * 0.35);
+        color = base.clone().lerp(new THREE.Color(1, 1, 1), energy * particleSettings.manualLightBoost);
       } else {
         const hueOffset = (Math.random() - 0.5) * particleSettings.hueRange;
         const hue = THREE.MathUtils.euclideanModulo(particleSettings.hueBase + hueOffset, 1);
@@ -237,21 +237,36 @@ export const ParticlesScene: React.FC = () => {
     };
   }, [analyser, getFrequencyData, particleSettings]);
 
-  const surfaceStyle = backgroundUrl
-    ? {
-        backgroundImage: `url(${backgroundUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      }
-    : undefined;
+  const aspectRatioStyle = useMemo<CSSProperties>(() => {
+    if (!backgroundSize || backgroundSize.height === 0) {
+      return { aspectRatio: '16 / 9' };
+    }
+    return {
+      aspectRatio: `${backgroundSize.width} / ${backgroundSize.height}`,
+    };
+  }, [backgroundSize]);
+
+  const surfaceStyle = useMemo<CSSProperties>(() => {
+    const base: CSSProperties = backgroundUrl
+      ? {
+          backgroundImage: `url(${backgroundUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }
+      : {
+          backgroundColor: '#020617',
+        };
+    return {
+      ...base,
+      ...aspectRatioStyle,
+      minHeight: '26rem',
+    };
+  }, [aspectRatioStyle, backgroundUrl]);
 
   return (
-    <div
-      className="relative aspect-[16/9] w-full min-h-[26rem] overflow-hidden rounded-2xl border border-slate-800 shadow-lg"
-      style={surfaceStyle}
-    >
-      <div className="pointer-events-none absolute inset-0 bg-slate-950/35" />
+    <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 shadow-lg" style={surfaceStyle}>
+      {backgroundUrl ? <div className="pointer-events-none absolute inset-0 bg-slate-950/35" /> : null}
       <div ref={containerRef} className="relative h-full w-full" />
     </div>
   );

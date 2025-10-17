@@ -66,6 +66,7 @@ export type ParticlesSettings = {
   lightnessGain: number;
   paletteMode: 'auto' | 'manual';
   manualPreset: string;
+  manualLightBoost: number;
 };
 
 export type FluidSettings = {
@@ -86,6 +87,12 @@ export type FluidSettings = {
   paletteMix: number;
   paletteMode: 'auto' | 'manual';
   manualPreset: string;
+  manualLightBoost: number;
+  energyFloor: number;
+  splatForce: number;
+  splatRadius: number;
+  densityDissipation: number;
+  velocityDissipation: number;
 };
 
 export interface VisualizerSettings {
@@ -156,6 +163,7 @@ const defaultSettings: VisualizerSettings = {
     lightnessGain: 0.2,
     paletteMode: 'auto',
     manualPreset: DEFAULT_PARTICLE_PRESET,
+    manualLightBoost: 0.35,
   },
   fluid: {
     energyBoost: 1,
@@ -175,6 +183,12 @@ const defaultSettings: VisualizerSettings = {
     paletteMix: 0.4,
     paletteMode: 'auto',
     manualPreset: DEFAULT_FLUID_PRESET,
+    manualLightBoost: 0.35,
+    energyFloor: 0.02,
+    splatForce: 6000,
+    splatRadius: 0.25,
+    densityDissipation: 1,
+    velocityDissipation: 0.2,
   },
 };
 
@@ -188,8 +202,7 @@ const clampNumber = (value: number, min: number, max: number) => {
 const PARTICLE_PRESET_SET = new Set(PARTICLE_COLOR_PRESETS.map((preset) => preset.id));
 const FLUID_PRESET_SET = new Set(FLUID_COLOR_PRESETS.map((preset) => preset.id));
 
-const normalizePaletteMode = (value: unknown): 'auto' | 'manual' =>
-  value === 'manual' ? 'manual' : 'auto';
+const normalizePaletteMode = (value: unknown): 'auto' | 'manual' => (value === 'manual' ? 'manual' : 'auto');
 
 const normalizePreset = (value: unknown, fallback: string, valid: Set<string>) =>
   typeof value === 'string' && valid.has(value) ? value : fallback;
@@ -207,11 +220,8 @@ const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerS
     lightnessBase: clampNumber(overrides?.particles?.lightnessBase ?? base.particles.lightnessBase, 0, 1),
     lightnessGain: clampNumber(overrides?.particles?.lightnessGain ?? base.particles.lightnessGain, 0, 1),
     paletteMode: normalizePaletteMode(overrides?.particles?.paletteMode),
-    manualPreset: normalizePreset(
-      overrides?.particles?.manualPreset,
-      base.particles.manualPreset,
-      PARTICLE_PRESET_SET,
-    ),
+    manualPreset: normalizePreset(overrides?.particles?.manualPreset, base.particles.manualPreset, PARTICLE_PRESET_SET),
+    manualLightBoost: clampNumber(overrides?.particles?.manualLightBoost ?? base.particles.manualLightBoost, 0, 1),
   },
   fluid: {
     ...base.fluid,
@@ -233,6 +243,12 @@ const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerS
     paletteMix: clampNumber(overrides?.fluid?.paletteMix ?? base.fluid.paletteMix, 0, 1),
     paletteMode: normalizePaletteMode(overrides?.fluid?.paletteMode),
     manualPreset: normalizePreset(overrides?.fluid?.manualPreset, base.fluid.manualPreset, FLUID_PRESET_SET),
+    manualLightBoost: clampNumber(overrides?.fluid?.manualLightBoost ?? base.fluid.manualLightBoost, 0, 1),
+    energyFloor: clampNumber(overrides?.fluid?.energyFloor ?? base.fluid.energyFloor, 0, 0.2),
+    splatForce: clampNumber(overrides?.fluid?.splatForce ?? base.fluid.splatForce, 500, 15000),
+    splatRadius: clampNumber(overrides?.fluid?.splatRadius ?? base.fluid.splatRadius, 0.05, 1),
+    densityDissipation: clampNumber(overrides?.fluid?.densityDissipation ?? base.fluid.densityDissipation, 0.1, 5),
+    velocityDissipation: clampNumber(overrides?.fluid?.velocityDissipation ?? base.fluid.velocityDissipation, 0.05, 5),
   },
 });
 
@@ -240,10 +256,7 @@ export type VisualizerSection = keyof VisualizerSettings;
 
 interface VisualizerSettingsContextValue {
   settings: VisualizerSettings;
-  updateSettings: <Section extends VisualizerSection>(
-    section: Section,
-    values: Partial<VisualizerSettings[Section]>,
-  ) => void;
+  updateSettings: <Section extends VisualizerSection>(section: Section, values: Partial<VisualizerSettings[Section]>) => void;
   resetSection: (section: VisualizerSection) => void;
   resetAll: () => void;
   replaceSettings: (next: Partial<VisualizerSettings>) => void;

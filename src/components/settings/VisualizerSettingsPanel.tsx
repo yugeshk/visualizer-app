@@ -43,6 +43,7 @@ const computePanelDefinition = (
     return [
       { key: 'paletteMode', label: 'Colour Mode', kind: 'select', options: paletteModeOptions as unknown as { value: string; label: string }[], description: 'Switch between audio reactive colouring and manual presets.' },
       { key: 'manualPreset', label: 'Manual Palette', kind: 'select', options: particlePresetOptions, description: 'Pick a preset when manual mode is active.', disabled: (settings) => settings.paletteMode !== 'manual' },
+      { key: 'manualLightBoost', label: 'Manual Light Boost', min: 0, max: 1, step: 0.01, description: 'How much the manual palette brightens when the music swells.', disabled: (settings) => settings.paletteMode !== 'manual' },
       { key: 'spawnBase', label: 'Spawn Base', min: 0, max: 30, step: 1, description: 'Particles emitted each frame before audio influence.' },
       { key: 'spawnMultiplier', label: 'Spawn Multiplier', min: 0, max: 120, step: 1, description: 'Extra particles fired as the track gets louder.' },
       { key: 'speedBase', label: 'Base Speed', min: 0, max: 20, step: 0.5, description: 'Starting velocity applied to every particle.' },
@@ -79,7 +80,13 @@ const computePanelDefinition = (
       { key: 'saturationGain', label: 'Saturation Gain', min: 0, max: 1, step: 0.01, description: 'Additional saturation applied from energy.', disabled: (settings) => settings.paletteMode === 'manual' },
       { key: 'lightnessBase', label: 'Lightness Base', min: 0, max: 1, step: 0.01, description: 'Baseline lightness value.', disabled: (settings) => settings.paletteMode === 'manual' },
       { key: 'lightnessGain', label: 'Lightness Gain', min: 0, max: 1, step: 0.01, description: 'Lightness boost supplied by the analyser.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'manualLightBoost', label: 'Manual Light Boost', min: 0, max: 1, step: 0.01, description: 'How much the manual palette brightens in response to energy.', disabled: (settings) => settings.paletteMode !== 'manual' },
       { key: 'paletteMix', label: 'Reactive Mix', min: 0, max: 1, step: 0.01, description: 'Blend between palette colour and analyser RGB.', disabled: (settings) => settings.paletteMode === 'manual' },
+      { key: 'energyFloor', label: 'Audio Floor', min: 0, max: 0.2, step: 0.005, description: 'Ignore analyser energy below this threshold to keep the fluid calm during quiet sections.' },
+      { key: 'splatForce', label: 'Splat Force', min: 500, max: 15000, step: 100, description: 'Velocity imparted to each splat. Raise for more explosive motion.' },
+      { key: 'splatRadius', label: 'Splat Radius', min: 0.05, max: 1, step: 0.01, description: 'Size of the injected dye. Larger values create broader strokes.' },
+      { key: 'densityDissipation', label: 'Density Dissipation', min: 0.1, max: 5, step: 0.05, description: 'How quickly colour fades from the fluid.' },
+      { key: 'velocityDissipation', label: 'Velocity Dissipation', min: 0.05, max: 5, step: 0.05, description: 'How quickly motion energy decays.' },
       { key: 'autoSplats', label: 'Audio Reactive Splats', kind: 'toggle', description: 'Enable automatic splats driven by audio energy.' },
       { key: 'manualSplatCount', label: 'Manual Splat Count', min: 1, max: 80, step: 1, description: 'Number of splats fired when you press Trigger.' },
     ];
@@ -91,9 +98,6 @@ const computePanelDefinition = (
 const resolveSectionKey = (path: string): VisualizerSection | null => {
   if (path === '/particles') return 'particles';
   if (path === '/fluid') return 'fluid';
-  if (path === '/torus') return 'torus';
-  if (path.startsWith('/sphere')) return 'sphere';
-  if (path === '/terrain') return 'terrain';
   return null;
 };
 
@@ -204,8 +208,9 @@ export const VisualizerSettingsPanel: React.FC = () => {
           onChange={(event) => {
             if (isDisabled) return;
             const next = Number.parseFloat(event.target.value);
+            const clamped = clampNumber(next, control.min, control.max);
             updateSettings(sectionKey, {
-              [control.key]: next,
+              [control.key]: clamped,
             } as Partial<VisualizerSettings[typeof sectionKey]>);
           }}
           disabled={isDisabled}

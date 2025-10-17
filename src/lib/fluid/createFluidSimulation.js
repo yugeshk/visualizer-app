@@ -101,6 +101,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
   let pointers = [];
   let splatStack = [];
   let pointerColorOverride = null;
+  let audioEnergyFloor = 0.02;
 
 
   const normalize01 = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
@@ -133,7 +134,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
 
   const queueAudioSplats = (energy, color) => {
       const strength = normalize01(energy);
-      if (strength <= 0.001) return;
+      if (strength <= audioEnergyFloor) return;
       const amount = Math.min(120, Math.round(strength * 60));
       if (amount <= 0) return;
       const colorObject = toColorObject(color);
@@ -142,7 +143,34 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
 
   const updateConfig = (partial) => {
       if (!partial) return;
-      Object.assign(config, partial);
+      const next = { ...partial };
+
+      if (next.AUDIO_ENERGY_FLOOR !== undefined) {
+          audioEnergyFloor = normalize01(Number(next.AUDIO_ENERGY_FLOOR));
+          delete next.AUDIO_ENERGY_FLOOR;
+      }
+      if (next.SPLAT_FORCE !== undefined) {
+          const force = Number(next.SPLAT_FORCE);
+          if (Number.isFinite(force)) config.SPLAT_FORCE = force;
+          delete next.SPLAT_FORCE;
+      }
+      if (next.SPLAT_RADIUS !== undefined) {
+          const radius = Number(next.SPLAT_RADIUS);
+          if (Number.isFinite(radius)) config.SPLAT_RADIUS = radius;
+          delete next.SPLAT_RADIUS;
+      }
+      if (next.DENSITY_DISSIPATION !== undefined) {
+          const density = Number(next.DENSITY_DISSIPATION);
+          if (Number.isFinite(density)) config.DENSITY_DISSIPATION = density;
+          delete next.DENSITY_DISSIPATION;
+      }
+      if (next.VELOCITY_DISSIPATION !== undefined) {
+          const velocity = Number(next.VELOCITY_DISSIPATION);
+          if (Number.isFinite(velocity)) config.VELOCITY_DISSIPATION = velocity;
+          delete next.VELOCITY_DISSIPATION;
+      }
+
+      Object.assign(config, next);
   };
 
   const setPaletteOverride = (mode, colorArray) => {
