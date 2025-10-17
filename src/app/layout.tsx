@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Audio Visual Playground",
   description: "Experiment with audio reactive WebGL visualizations",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

@@ -25,7 +25,6 @@ SOFTWARE.
 /* eslint-disable */
 
 export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
-  'use strict';
 
   /*
   MIT License
@@ -102,7 +101,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
   let pointers = [];
   let splatStack = [];
 
-  const clamp01 = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+  const normalize01 = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 
   const toColorObject = (value) => {
       if (!value) return null;
@@ -131,7 +130,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
   };
 
   const queueAudioSplats = (energy, color) => {
-      const strength = clamp01(energy);
+      const strength = normalize01(energy);
       const amount = Math.max(1, Math.min(60, Math.round(strength * 45)));
       const colorObject = toColorObject(color);
       splatStack.push({ count: amount, color: colorObject, strength });
@@ -1398,7 +1397,7 @@ export const createFluidSimulation = (targetCanvas, userConfig = {}) => {
 
       const spawn = (count, color, strength) => {
           const amount = Math.max(1, Math.min(240, Math.round(count)));
-          const energy = clamp01(strength);
+          const energy = normalize01(strength);
           const intensity = 4 + energy * 16;
           const velocityScale = 400 + energy * 900;
 
