@@ -87,6 +87,12 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
 
     Object.assign(config, normalizedUserConfig);
 
+    if (config.TRANSPARENT) {
+        config.BLOOM = false;
+        config.SUNRAYS = false;
+        config.SHADING = false;
+    }
+
   function pointerPrototype () {
       this.id = -1;
       this.texcoordX = 0;
@@ -1342,8 +1348,6 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
 
       if (!config.TRANSPARENT)
           drawColor(target, normalizeColor(config.BACK_COLOR));
-      if (target == null && config.TRANSPARENT)
-          drawCheckerboard(target);
       drawDisplay(target);
   }
 

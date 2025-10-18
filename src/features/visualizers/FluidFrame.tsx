@@ -124,7 +124,13 @@ export const FluidFrame: React.FC = () => {
     canvas.style.display = 'block';
 
     try {
-      const simulation = createFluidSimulation(canvas);
+      const simulation = createFluidSimulation(canvas, {
+        TRANSPARENT: true,
+        BACK_COLOR: { r: 0, g: 0, b: 0 },
+        BLOOM: false,
+        SUNRAYS: false,
+        SHADING: false,
+      });
       simulationRef.current = simulation;
       simulation.setPaused(false);
     } catch (error) {
@@ -254,12 +260,7 @@ export const FluidFrame: React.FC = () => {
   return (
     <div className="space-y-3">
       <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 shadow-lg" style={surfaceStyle}>
-        {backgroundUrl ? <div className="pointer-events-none absolute inset-0 bg-slate-950/40" /> : null}
-        <canvas
-          ref={canvasRef}
-          className="relative z-10 block h-full w-full"
-          style={{ mixBlendMode: 'screen' }}
-        />
+        <canvas ref={canvasRef} className="relative z-10 block h-full w-full" />
       </div>
       {!fluidSettings.autoSplats && (
         <div className="flex flex-wrap items-center gap-3 text-sm text-slate-200">

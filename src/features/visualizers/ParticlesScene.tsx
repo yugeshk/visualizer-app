@@ -266,7 +266,6 @@ export const ParticlesScene: React.FC = () => {
 
   return (
     <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 shadow-lg" style={surfaceStyle}>
-      {backgroundUrl ? <div className="pointer-events-none absolute inset-0 bg-slate-950/35" /> : null}
       <div ref={containerRef} className="relative h-full w-full" />
     </div>
   );
