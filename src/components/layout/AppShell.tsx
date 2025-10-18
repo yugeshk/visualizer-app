@@ -57,7 +57,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </div>
         </main>
         <footer className="border-t border-slate-800 bg-slate-900/80 py-4 text-center text-xs text-slate-500">
-          Built on Next.js · Visual experiments by repurposing existing WebGL demos.
+          Prem Mahotsav 2025 ❤️
         </footer>
       </div>
     </div>

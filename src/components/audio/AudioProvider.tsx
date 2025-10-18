@@ -22,6 +22,9 @@ interface AudioContextValue {
   clearPersistedAudio: () => Promise<void>;
   getFrequencyData: (target: Uint8Array<ArrayBufferLike>) => void;
   getWaveformData: (target: Float32Array<ArrayBufferLike>) => void;
+  currentTime: number;
+  duration: number;
+  seekTo: (time: number) => void;
 }
 
 const AudioContext = createContext<AudioContextValue | undefined>(undefined);
@@ -41,6 +44,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentFileName, setCurrentFileName] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   useEffect(() => {
     const AudioContextClass =
@@ -80,6 +85,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
       const now = Date.now();
       if (now - lastPersistRef.current < PLAYBACK_THROTTLE_MS) return;
       lastPersistRef.current = now;
@@ -88,10 +94,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
+    const handleLoadedMetadata = () => {
+      setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+      setCurrentTime(audio.currentTime || 0);
+    };
+
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handlePause);
     audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     audioElementRef.current = audio;
     audioContextRef.current = context;
@@ -117,6 +129,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         queuedUrlRef.current = url;
         setCurrentFileName(stored.name);
+        setDuration(0);
+        setCurrentTime(0);
         audio.src = url;
 
         const playbackState = loadPlaybackState();
@@ -124,6 +138,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (playbackState) {
             audio.currentTime = Math.max(0, playbackState.position || 0);
             savePlaybackState({ position: audio.currentTime, wasPlaying: false });
+            setCurrentTime(audio.currentTime);
           }
           audio.removeEventListener('loadedmetadata', applyPlaybackState);
           restoringRef.current = false;
@@ -144,6 +159,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('ended', handlePause);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
 
       if (queuedUrlRef.current) {
         URL.revokeObjectURL(queuedUrlRef.current);
@@ -162,6 +178,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audio.pause();
     audio.currentTime = 0;
     savePlaybackState({ position: 0, wasPlaying: false });
+    setCurrentTime(0);
   }, []);
 
   const loadFile = useCallback(async (file: File) => {
@@ -178,6 +195,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     stop();
     setCurrentFileName(file.name);
+    setDuration(0);
+    setCurrentTime(0);
     audio.src = objectUrl;
     audio.load();
     await storeAudioFile(file);
@@ -226,6 +245,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audio.removeAttribute('src');
     audio.load();
     setCurrentFileName(null);
+    setCurrentTime(0);
+    setDuration(0);
     await clearStoredAudio();
     clearPlaybackState();
   }, [stop]);
@@ -242,6 +263,18 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     analyser.getFloatTimeDomainData(target as Float32Array<ArrayBuffer>);
   }, []);
 
+  const seekTo = useCallback((time: number) => {
+    const audio = audioElementRef.current;
+    if (!audio) return;
+    const hasDuration = Number.isFinite(audio.duration) && audio.duration > 0;
+    const target = hasDuration ? Math.min(Math.max(time, 0), audio.duration) : Math.max(time, 0);
+    audio.currentTime = target;
+    setCurrentTime(target);
+    if (!restoringRef.current) {
+      savePlaybackState({ position: target, wasPlaying: !audio.paused });
+    }
+  }, []);
+
   const value = useMemo<AudioContextValue>(() => ({
     analyser: analyserRef.current,
     audioElement: audioElementRef.current,
@@ -254,7 +287,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     clearPersistedAudio,
     getFrequencyData,
     getWaveformData,
-  }), [clearPersistedAudio, currentFileName, getFrequencyData, getWaveformData, isPlaying, isReady, loadFile, stop, togglePlayback]);
+    currentTime,
+    duration,
+    seekTo,
+  }), [clearPersistedAudio, currentFileName, currentTime, duration, getFrequencyData, getWaveformData, isPlaying, isReady, loadFile, seekTo, stop, togglePlayback]);
 
   return <AudioContext.Provider value={value}>{children}</AudioContext.Provider>;
 };

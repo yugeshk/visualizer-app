@@ -5,6 +5,7 @@ import { useBackground } from '@/components/background/BackgroundProvider';
 import { useVisualizerSettings } from '@/components/settings/VisualizerSettingsProvider';
 import { createFluidSimulation } from '@/lib/fluid/createFluidSimulation';
 import { FLUID_PRESET_MAP } from '@/lib/palettes';
+import { FluidFrequencyAnalyzer } from './FluidFrequencyAnalyzer';
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from 'react';
 
 const average = (buffer: Uint8Array, start: number, end: number) => {
@@ -260,7 +261,7 @@ export const FluidFrame: React.FC = () => {
   }, [aspectRatioStyle, backgroundUrl]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 shadow-lg" style={surfaceStyle}>
         <canvas ref={canvasRef} className="relative z-10 block h-full w-full" />
       </div>
@@ -278,6 +279,7 @@ export const FluidFrame: React.FC = () => {
           </span>
         </div>
       )}
+      <FluidFrequencyAnalyzer />
     </div>
   );
 };

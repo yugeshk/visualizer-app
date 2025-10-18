@@ -1,13 +1,24 @@
 'use client';
 
-import React, { ChangeEvent, useRef } from 'react';
+import React, { ChangeEvent, useMemo, useRef } from 'react';
 import { useAudio } from './AudioProvider';
 import { useBackground } from '../background/BackgroundProvider';
 
 export const AudioControls: React.FC = () => {
   const audioFileRef = useRef<HTMLInputElement | null>(null);
   const backgroundFileRef = useRef<HTMLInputElement | null>(null);
-  const { currentFileName, isPlaying, isReady, loadFile, togglePlayback, stop, clearPersistedAudio } = useAudio();
+  const {
+    currentFileName,
+    currentTime,
+    duration,
+    isPlaying,
+    isReady,
+    loadFile,
+    togglePlayback,
+    stop,
+    clearPersistedAudio,
+    seekTo,
+  } = useAudio();
   const { backgroundName, loadBackground, clearBackground, isReady: isBackgroundReady } = useBackground();
 
   const onAudioChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -26,6 +37,19 @@ export const AudioControls: React.FC = () => {
     if (backgroundFileRef.current) {
       backgroundFileRef.current.value = '';
     }
+  };
+
+  const seekable = isReady && duration > 0;
+  const safeDuration = duration > 0 ? duration : 1;
+  const progressValue = seekable ? Math.min(Math.max(currentTime, 0), duration) : 0;
+
+  const formattedCurrentTime = useMemo(() => formatTime(currentTime), [currentTime]);
+  const formattedDuration = useMemo(() => formatTime(duration), [duration]);
+
+  const handleSeek = (event: ChangeEvent<HTMLInputElement>) => {
+    const next = Number(event.target.value);
+    if (Number.isNaN(next)) return;
+    seekTo(next);
   };
 
   return (
@@ -92,10 +116,35 @@ export const AudioControls: React.FC = () => {
       >
         Clear Background
       </button>
+      <div className="flex min-w-full flex-col gap-2 md:flex-1">
+        <input
+          type="range"
+          className="h-2 w-full cursor-pointer appearance-none rounded bg-slate-800 accent-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+          min={0}
+          max={safeDuration}
+          step={0.01}
+          value={seekable ? progressValue : 0}
+          onChange={handleSeek}
+          disabled={!seekable}
+          aria-label="Seek audio"
+        />
+        <div className="flex justify-between text-xs text-slate-400">
+          <span>{formattedCurrentTime}</span>
+          <span>{formattedDuration}</span>
+        </div>
+      </div>
       <div className="flex flex-col gap-1 text-sm opacity-80">
         <p className="truncate">{currentFileName ? `Audio: ${currentFileName}` : 'No audio selected'}</p>
         <p className="truncate">{backgroundName ? `Background: ${backgroundName}` : 'No background selected'}</p>
       </div>
     </section>
   );
+};
+
+const formatTime = (seconds: number): string => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0:00';
+  const total = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
