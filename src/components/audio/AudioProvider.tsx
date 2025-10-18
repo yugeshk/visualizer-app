@@ -20,8 +20,8 @@ interface AudioContextValue {
   togglePlayback: () => Promise<void>;
   stop: () => void;
   clearPersistedAudio: () => Promise<void>;
-  getFrequencyData: (target: Uint8Array) => void;
-  getWaveformData: (target: Float32Array) => void;
+  getFrequencyData: (target: Uint8Array<ArrayBufferLike>) => void;
+  getWaveformData: (target: Float32Array<ArrayBufferLike>) => void;
 }
 
 const AudioContext = createContext<AudioContextValue | undefined>(undefined);
@@ -230,16 +230,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     clearPlaybackState();
   }, [stop]);
 
-  const getFrequencyData = useCallback((target: Uint8Array) => {
+  const getFrequencyData = useCallback((target: Uint8Array<ArrayBufferLike>) => {
     const analyser = analyserRef.current;
     if (!analyser) return;
-    analyser.getByteFrequencyData(target);
+    analyser.getByteFrequencyData(target as Uint8Array<ArrayBuffer>);
   }, []);
 
-  const getWaveformData = useCallback((target: Float32Array) => {
+  const getWaveformData = useCallback((target: Float32Array<ArrayBufferLike>) => {
     const analyser = analyserRef.current;
     if (!analyser) return;
-    analyser.getFloatTimeDomainData(target);
+    analyser.getFloatTimeDomainData(target as Float32Array<ArrayBuffer>);
   }, []);
 
   const value = useMemo<AudioContextValue>(() => ({

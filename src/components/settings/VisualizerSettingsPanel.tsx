@@ -36,11 +36,14 @@ const clampNumber = (value: number, min: number | undefined, max: number | undef
   return next;
 };
 
+type FocusSection = Extract<VisualizerSection, 'particles' | 'fluid'>;
+type FocusControl = ControlDefinition<'particles'> | ControlDefinition<'fluid'>;
+
 const computePanelDefinition = (
   pathname: string,
-): ControlDefinition<VisualizerSection>[] | null => {
+): FocusControl[] | null => {
   if (pathname === '/particles') {
-    return [
+    const particleControls: ControlDefinition<'particles'>[] = [
       { key: 'paletteMode', label: 'Colour Mode', kind: 'select', options: paletteModeOptions as unknown as { value: string; label: string }[], description: 'Switch between audio reactive colouring and manual presets.' },
       { key: 'manualPreset', label: 'Manual Palette', kind: 'select', options: particlePresetOptions, description: 'Pick a preset when manual mode is active.', disabled: (settings) => settings.paletteMode !== 'manual' },
       { key: 'manualLightBoost', label: 'Manual Light Boost', min: 0, max: 1, step: 0.01, description: 'How much the manual palette brightens when the music swells.', disabled: (settings) => settings.paletteMode !== 'manual' },
@@ -62,10 +65,11 @@ const computePanelDefinition = (
       { key: 'lightnessBase', label: 'Lightness Base', min: 0, max: 1, step: 0.01, description: 'Baseline lightness for automatic colouring.', disabled: (settings) => settings.paletteMode === 'manual' },
       { key: 'lightnessGain', label: 'Lightness Gain', min: 0, max: 1, step: 0.01, description: 'Extra lightness added while the song peaks.', disabled: (settings) => settings.paletteMode === 'manual' },
     ];
+    return particleControls as FocusControl[];
   }
 
   if (pathname === '/fluid') {
-    return [
+    const fluidControls: ControlDefinition<'fluid'>[] = [
       { key: 'paletteMode', label: 'Colour Mode', kind: 'select', options: paletteModeOptions as unknown as { value: string; label: string }[], description: 'Choose between audio reactive colouring and manual presets.' },
       { key: 'manualPreset', label: 'Manual Palette', kind: 'select', options: fluidPresetOptions, description: 'Pick a palette when manual mode is active.', disabled: (settings) => settings.paletteMode !== 'manual' },
       { key: 'energyBoost', label: 'Energy Boost', min: 0.1, max: 4, step: 0.1, description: 'Amplifies analyser energy before it drives the fluid.' },
@@ -91,12 +95,13 @@ const computePanelDefinition = (
       { key: 'autoSplats', label: 'Audio Reactive Splats', kind: 'toggle', description: 'Enable automatic splats driven by audio energy.' },
       { key: 'manualSplatCount', label: 'Manual Splat Count', min: 1, max: 80, step: 1, description: 'Number of splats fired when you press Trigger.' },
     ];
+    return fluidControls as FocusControl[];
   }
 
   return null;
 };
 
-const resolveSectionKey = (path: string): VisualizerSection | null => {
+const resolveSectionKey = (path: string): FocusSection | null => {
   if (path === '/particles') return 'particles';
   if (path === '/fluid') return 'fluid';
   return null;
@@ -153,7 +158,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
     setInfoKey((current) => (current === key ? null : key));
   };
 
-  const renderSlider = (control: ControlDefinition<VisualizerSection>) => {
+  const renderSlider = (control: FocusControl) => {
     const controlKey = String(control.key);
     const rawValue = Number(sectionSettings[controlKey]) || 0;
     const value = clampNumber(rawValue, control.min, control.max);
@@ -223,7 +228,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
     );
   };
 
-  const renderToggle = (control: ControlDefinition<VisualizerSection>) => {
+  const renderToggle = (control: FocusControl) => {
     const controlKey = String(control.key);
     const checked = Boolean(sectionSettings[controlKey]);
     return (
@@ -267,7 +272,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
     );
   };
 
-  const renderSelect = (control: ControlDefinition<VisualizerSection>) => {
+  const renderSelect = (control: FocusControl) => {
     const controlKey = String(control.key);
     const options = control.options ?? [];
     const value = String(sectionSettings[controlKey] ?? options[0]?.value ?? '');
@@ -316,7 +321,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
     );
   };
 
-  const renderControl = (control: ControlDefinition<VisualizerSection>) => {
+  const renderControl = (control: FocusControl) => {
     if (control.kind === 'toggle') return renderToggle(control);
     if (control.kind === 'select') return renderSelect(control);
     return renderSlider(control);
