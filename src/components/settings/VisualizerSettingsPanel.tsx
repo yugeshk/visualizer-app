@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import React, { useMemo, useRef, useState } from 'react';
 import { useVisualizerSettings, VisualizerSection, VisualizerSettings } from './VisualizerSettingsProvider';
 import { fluidPresetOptions, paletteModeOptions, particlePresetOptions } from '@/lib/palettes';
+import { fluidSplatPresetOptions } from '@/lib/fluid/splatPresets';
 
 interface ControlDefinition<Section extends VisualizerSection> {
   key: keyof VisualizerSettings[Section];
@@ -72,6 +73,7 @@ const computePanelDefinition = (
     const fluidControls: ControlDefinition<'fluid'>[] = [
       { key: 'paletteMode', label: 'Colour Mode', kind: 'select', options: paletteModeOptions as unknown as { value: string; label: string }[], description: 'Choose between audio reactive colouring and manual presets.' },
       { key: 'manualPreset', label: 'Manual Palette', kind: 'select', options: fluidPresetOptions, description: 'Pick a palette when manual mode is active.', disabled: (settings) => settings.paletteMode !== 'manual' },
+      { key: 'splatPreset', label: 'Splat Preset', kind: 'select', options: fluidSplatPresetOptions, description: 'Select the structural pattern used when audio injects new splats.' },
       { key: 'energyBoost', label: 'Energy Boost', min: 0.1, max: 4, step: 0.1, description: 'Amplifies analyser energy before it drives the fluid.' },
       { key: 'audioReactivity', label: 'Audio Reactivity', min: 0.05, max: 3, step: 0.05, description: 'Scales the amount, speed, and brightness of audio-driven splats.' },
       { key: 'bassWeight', label: 'Bass Weight', min: 0, max: 1.5, step: 0.05, description: 'Relative importance of bass frequencies.' },
@@ -117,6 +119,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
   const { settings, updateSettings, resetSection, replaceSettings } = useVisualizerSettings();
   const [collapsed, setCollapsed] = useState(true);
   const [infoKey, setInfoKey] = useState<string | null>(null);
+  const [showAllInfo, setShowAllInfo] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!sectionKey || !controls) return null;
@@ -155,6 +158,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
   };
 
   const handleInfoToggle = (key: string) => {
+    if (showAllInfo) return;
     setInfoKey((current) => (current === key ? null : key));
   };
 
@@ -221,7 +225,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
           }}
           disabled={isDisabled}
         />
-        {infoKey === controlKey && control.description ? (
+        {(showAllInfo || infoKey === controlKey) && control.description ? (
           <p className="mt-2 text-[11px] text-slate-400">{control.description}</p>
         ) : null}
       </div>
@@ -265,7 +269,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
           />
           <span className="text-xs text-slate-300">Toggle</span>
         </label>
-        {infoKey === controlKey && control.description ? (
+        {(showAllInfo || infoKey === controlKey) && control.description ? (
           <p className="mt-2 text-[11px] text-slate-400">{control.description}</p>
         ) : null}
       </div>
@@ -314,7 +318,7 @@ export const VisualizerSettingsPanel: React.FC = () => {
             </option>
           ))}
         </select>
-        {infoKey === controlKey && control.description ? (
+        {(showAllInfo || infoKey === controlKey) && control.description ? (
           <p className="mt-2 text-[11px] text-slate-400">{control.description}</p>
         ) : null}
       </div>
@@ -379,6 +383,25 @@ export const VisualizerSettingsPanel: React.FC = () => {
       />
       <div className={`mt-4 flex flex-wrap items-center justify-between gap-3 ${collapsed ? 'hidden lg:flex' : 'flex'}`}>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowAllInfo((current) => {
+                const next = !current;
+                if (next) {
+                  setInfoKey(null);
+                }
+                return next;
+              });
+            }}
+            className={`rounded border px-3 py-1 text-xs transition ${
+              showAllInfo
+                ? 'border-blue-400 text-blue-100'
+                : 'border-slate-700 text-slate-300 hover:border-blue-500 hover:text-blue-200'
+            }`}
+          >
+            {showAllInfo ? 'Hide All Info' : 'Show All Info'}
+          </button>
           <button
             type="button"
             onClick={() => resetSection(sectionKey)}

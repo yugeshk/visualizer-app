@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { FLUID_COLOR_PRESETS, PARTICLE_COLOR_PRESETS } from '@/lib/palettes';
+import { FLUID_SPLAT_PRESETS, FLUID_SPLAT_PRESET_SET, type FluidSplatPresetId } from '@/lib/fluid/splatPresets';
 
 const DEFAULT_PARTICLE_PRESET = PARTICLE_COLOR_PRESETS[0]?.id ?? 'sunrise';
 const DEFAULT_FLUID_PRESET = FLUID_COLOR_PRESETS[0]?.id ?? 'aurora';
@@ -90,6 +91,7 @@ export type FluidSettings = {
   manualPreset: string;
   manualLightBoost: number;
   energyFloor: number;
+  splatPreset: FluidSplatPresetId;
   splatForce: number;
   splatRadius: number;
   densityDissipation: number;
@@ -187,6 +189,7 @@ const defaultSettings: VisualizerSettings = {
     manualPreset: DEFAULT_FLUID_PRESET,
     manualLightBoost: 0.35,
     energyFloor: 0.02,
+    splatPreset: FLUID_SPLAT_PRESETS[0]?.id ?? 'random',
     splatForce: 6000,
     splatRadius: 0.25,
     densityDissipation: 1,
@@ -208,6 +211,11 @@ const normalizePaletteMode = (value: unknown): 'auto' | 'manual' => (value === '
 
 const normalizePreset = (value: unknown, fallback: string, valid: Set<string>) =>
   typeof value === 'string' && valid.has(value) ? value : fallback;
+
+const normalizeFluidSplatPreset = (value: unknown, fallback: FluidSplatPresetId): FluidSplatPresetId =>
+  typeof value === 'string' && FLUID_SPLAT_PRESET_SET.has(value as FluidSplatPresetId)
+    ? (value as FluidSplatPresetId)
+    : fallback;
 
 const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerSettings>): VisualizerSettings => ({
   torus: { ...base.torus, ...(overrides?.torus ?? {}) },
@@ -247,6 +255,7 @@ const mergeSections = (base: VisualizerSettings, overrides?: Partial<VisualizerS
     manualPreset: normalizePreset(overrides?.fluid?.manualPreset, base.fluid.manualPreset, FLUID_PRESET_SET),
     manualLightBoost: clampNumber(overrides?.fluid?.manualLightBoost ?? base.fluid.manualLightBoost, 0, 1),
     energyFloor: clampNumber(overrides?.fluid?.energyFloor ?? base.fluid.energyFloor, 0, 0.2),
+    splatPreset: normalizeFluidSplatPreset(overrides?.fluid?.splatPreset, base.fluid.splatPreset),
     audioReactivity: clampNumber(overrides?.fluid?.audioReactivity ?? base.fluid.audioReactivity, 0.05, 4),
     splatForce: clampNumber(overrides?.fluid?.splatForce ?? base.fluid.splatForce, 500, 15000),
     splatRadius: clampNumber(overrides?.fluid?.splatRadius ?? base.fluid.splatRadius, 0.05, 1),

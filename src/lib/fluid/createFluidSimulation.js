@@ -56,6 +56,219 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
   const canvas = targetCanvas;
   resizeCanvas();
 
+  const SUPPORTED_SPLAT_PRESETS = new Set([
+      'random',
+      'bottomLeftSpiral',
+      'centerPulse',
+      'ringBurst',
+      'verticalCascade',
+      'twinJets',
+      'orbitSweep',
+      'diagonalDrift',
+  ]);
+
+  const TAU = Math.PI * 2;
+
+  const splatGenerators = {
+      random: ({ count, emit }) => {
+          for (let i = 0; i < count; i++) {
+              emit({
+                  x: Math.random(),
+                  y: Math.random(),
+                  angle: Math.random() * TAU,
+                  speedMultiplier: 0.5 + Math.random() * 0.7,
+              });
+          }
+      },
+      bottomLeftSpiral: ({ count, energy, emit, randomScatter }) => {
+          const steps = Math.max(6, Math.min(count, 32));
+          let used = 0;
+          const baseX = 0.14;
+          const baseY = 0.14;
+          for (let i = 0; i < steps; i++) {
+              const t = steps <= 1 ? 0 : i / (steps - 1);
+              const angle = t * Math.PI * 3.2 + energy * Math.PI;
+              const radius = 0.02 + t * 0.22;
+              const x = clamp01(baseX + Math.cos(angle) * radius);
+              const y = clamp01(baseY + Math.sin(angle) * radius);
+              emit({
+                  x,
+                  y,
+                  angle: angle + Math.PI / 2,
+                  speedMultiplier: 0.6 + energy * 0.5,
+                  spread: 0.015 + t * 0.012,
+                  colorScale: 0.85 + t * 0.5,
+              });
+              used += 1;
+          }
+          if (count - used > 0) randomScatter(count - used);
+      },
+      centerPulse: ({ count, energy, emit, randomScatter }) => {
+          let used = 0;
+          emit({
+              x: 0.5,
+              y: 0.5,
+              angle: Math.random() * TAU,
+              speedMultiplier: 0.4 + energy * 0.6,
+              spread: 0.035,
+              colorScale: 1.2,
+          });
+          used += 1;
+
+          const offsets = [
+              { x: 0.5 + 0.16, y: 0.5, angle: 0 },
+              { x: 0.5 - 0.16, y: 0.5, angle: Math.PI },
+              { x: 0.5, y: 0.5 + 0.16, angle: Math.PI / 2 },
+              { x: 0.5, y: 0.5 - 0.16, angle: Math.PI * 1.5 },
+          ];
+
+          for (let i = 0; i < offsets.length && used < count; i++) {
+              const entry = offsets[i];
+              emit({
+                  x: clamp01(entry.x),
+                  y: clamp01(entry.y),
+                  angle: entry.angle,
+                  speedMultiplier: 0.7 + energy * 0.4,
+                  spread: 0.02,
+                  colorScale: 0.9,
+              });
+              used += 1;
+          }
+
+          const ringCount = Math.min(count - used, 12);
+          for (let i = 0; i < ringCount; i++) {
+              const theta = (i / (ringCount || 1)) * TAU;
+              const radius = 0.12 + energy * 0.18;
+              const x = clamp01(0.5 + Math.cos(theta) * radius);
+              const y = clamp01(0.5 + Math.sin(theta) * radius);
+              emit({
+                  x,
+                  y,
+                  angle: theta,
+                  speedMultiplier: 0.55 + energy * 0.45,
+                  spread: 0.012,
+                  colorScale: 0.85,
+              });
+              used += 1;
+          }
+
+          if (count - used > 0) randomScatter(count - used);
+      },
+      ringBurst: ({ count, energy, emit, randomScatter }) => {
+          const steps = Math.max(8, Math.min(count, 36));
+          const radius = 0.18 + energy * 0.22;
+          const speedMultiplier = 0.8 + energy * 0.5;
+          let used = 0;
+          for (let i = 0; i < steps; i++) {
+              const theta = (i / steps) * TAU;
+              const x = clamp01(0.5 + Math.cos(theta) * radius);
+              const y = clamp01(0.5 + Math.sin(theta) * radius);
+              emit({
+                  x,
+                  y,
+                  angle: theta,
+                  speedMultiplier,
+                  spread: 0.015,
+                  colorScale: 0.9,
+              });
+              used += 1;
+          }
+          if (count - used > 0) randomScatter(count - used);
+      },
+      verticalCascade: ({ count, energy, emit, randomScatter }) => {
+          const steps = Math.max(6, Math.min(count, 48));
+          const columnX = clamp01(0.25 + energy * 0.3);
+          let used = 0;
+          for (let i = 0; i < steps; i++) {
+              const t = steps <= 1 ? 0 : i / (steps - 1);
+              const y = clamp01(0.95 - t * 0.9);
+              const x = clamp01(columnX + (Math.random() - 0.5) * 0.15);
+              emit({
+                  x,
+                  y,
+                  angle: Math.PI * 1.5,
+                  speedMultiplier: 0.6 + energy * 0.8,
+                  spread: 0.02,
+                  colorScale: 0.75 + energy * 0.35,
+              });
+              used += 1;
+          }
+          if (count - used > 0) randomScatter(count - used);
+      },
+      twinJets: ({ count, energy, emit, randomScatter }) => {
+          const pairs = Math.max(1, Math.min(Math.floor(count / 2), 32));
+          let used = 0;
+          const speedMultiplier = 1 + energy * 0.8;
+          for (let i = 0; i < pairs; i++) {
+              const t = (i + 0.5) / pairs;
+              const baseY = clamp01(t + (Math.random() - 0.5) * 0.08);
+              emit({
+                  x: 0.05,
+                  y: clamp01(baseY + (Math.random() - 0.5) * 0.05),
+                  angle: 0,
+                  speedMultiplier,
+                  spread: 0.015,
+                  colorScale: 0.9,
+              });
+              used += 1;
+              if (used >= count) break;
+              emit({
+                  x: 0.95,
+                  y: clamp01(baseY + (Math.random() - 0.5) * 0.05),
+                  angle: Math.PI,
+                  speedMultiplier,
+                  spread: 0.015,
+                  colorScale: 0.9,
+              });
+              used += 1;
+              if (used >= count) break;
+          }
+          if (count - used > 0) randomScatter(count - used);
+      },
+      orbitSweep: ({ count, energy, emit, randomScatter }) => {
+          const steps = Math.max(8, Math.min(count, 40));
+          const phase = Math.random() * TAU;
+          const radius = 0.22 + energy * 0.18;
+          const speedMultiplier = 0.7 + energy * 0.6;
+          let used = 0;
+          for (let i = 0; i < steps; i++) {
+              const theta = phase + (i / steps) * TAU;
+              const x = clamp01(0.5 + Math.cos(theta) * radius);
+              const y = clamp01(0.5 + Math.sin(theta) * radius);
+              emit({
+                  x,
+                  y,
+                  angle: theta + Math.PI / 2,
+                  speedMultiplier,
+                  spread: 0.01,
+                  colorScale: 0.85 + 0.15 * Math.sin(theta),
+              });
+              used += 1;
+          }
+          if (count - used > 0) randomScatter(count - used);
+      },
+      diagonalDrift: ({ count, energy, emit, randomScatter }) => {
+          const steps = Math.max(6, Math.min(count, 40));
+          let used = 0;
+          const speedMultiplier = 0.5 + energy * 0.7;
+          for (let i = 0; i < steps; i++) {
+              const t = steps <= 1 ? 0 : i / (steps - 1);
+              const x = clamp01(0.1 + t * 0.8 + (Math.random() - 0.5) * 0.05);
+              const y = clamp01(0.9 - t * 0.8 + (Math.random() - 0.5) * 0.05);
+              emit({
+                  x,
+                  y,
+                  angle: Math.PI * 0.75,
+                  speedMultiplier,
+                  spread: 0.02,
+                  colorScale: 0.8 + 0.2 * t,
+              });
+              used += 1;
+          }
+          if (count - used > 0) randomScatter(count - used);
+      },
+  };
+
   let config = {
       SIM_RESOLUTION: 128,
       DYE_RESOLUTION: 1024,
@@ -82,6 +295,7 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
       SUNRAYS: true,
       SUNRAYS_RESOLUTION: 196,
       SUNRAYS_WEIGHT: 1.0,
+      SPLAT_PRESET: 'random',
       AUDIO_REACTIVITY: 1,
   }
 
@@ -185,6 +399,20 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
           const reactivity = Number(next.AUDIO_REACTIVITY);
           if (Number.isFinite(reactivity)) config.AUDIO_REACTIVITY = clampAudioReactivity(reactivity);
           delete next.AUDIO_REACTIVITY;
+      }
+      if (next.SPLAT_PRESET !== undefined) {
+          const preset = String(next.SPLAT_PRESET);
+          if (SUPPORTED_SPLAT_PRESETS.has(preset)) config.SPLAT_PRESET = preset;
+          delete next.SPLAT_PRESET;
+      }
+      if (next.TRANSPARENT !== undefined) {
+          config.TRANSPARENT = Boolean(next.TRANSPARENT);
+          if (config.TRANSPARENT) {
+              config.BLOOM = false;
+              config.SUNRAYS = false;
+              config.SHADING = false;
+          }
+          delete next.TRANSPARENT;
       }
 
       Object.assign(config, next);
@@ -1473,21 +1701,46 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
           const velocityScale = (400 + energy * 900) * velocityScaleBase;
           const scaledAmount = Math.max(1, Math.min(240, Math.round(amount * amountFactor)));
 
-          for (let i = 0; i < scaledAmount; i++) {
-              const base = color ?? generateColor();
+          const emit = ({ x, y, angle, speedMultiplier = 1, spread = 0, colorScale = 1 }) => {
+              const baseColour = color ?? generateColor();
               const tint = {
-                  r: base.r * intensity,
-                  g: base.g * intensity,
-                  b: base.b * intensity,
+                  r: baseColour.r * intensity * colorScale,
+                  g: baseColour.g * intensity * colorScale,
+                  b: baseColour.b * intensity * colorScale,
               };
-              const angle = Math.random() * Math.PI * 2;
-              const speed = velocityScale * (0.5 + Math.random() * 0.5);
+              const jitterX = (Math.random() - 0.5) * spread;
+              const jitterY = (Math.random() - 0.5) * spread;
+              const positionX = clamp01(x + jitterX);
+              const positionY = clamp01(y + jitterY);
+              const speed = velocityScale * speedMultiplier;
               const dx = Math.cos(angle) * speed;
               const dy = Math.sin(angle) * speed;
-              const x = Math.random();
-              const y = Math.random();
-              splat(x, y, dx, dy, tint);
-          }
+              splat(positionX, positionY, dx, dy, tint);
+          };
+
+          const randomScatter = (remaining) => {
+              for (let i = 0; i < remaining; i++) {
+                  emit({
+                      x: Math.random(),
+                      y: Math.random(),
+                      angle: Math.random() * TAU,
+                      speedMultiplier: 0.5 + Math.random() * 0.7,
+                  });
+              }
+          };
+
+          const generatorId = SUPPORTED_SPLAT_PRESETS.has(config.SPLAT_PRESET)
+              ? config.SPLAT_PRESET
+              : 'random';
+
+          const generator = splatGenerators[generatorId] || splatGenerators.random;
+          generator({
+              count: scaledAmount,
+              energy,
+              manual: Boolean(manual),
+              emit,
+              randomScatter,
+          });
       };
 
       if (typeof request === 'number') {
