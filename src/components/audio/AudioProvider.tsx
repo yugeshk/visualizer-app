@@ -25,6 +25,7 @@ interface AudioContextValue {
   currentTime: number;
   duration: number;
   seekTo: (time: number) => void;
+  getAudioStream: () => MediaStream | null;
 }
 
 const AudioContext = createContext<AudioContextValue | undefined>(undefined);
@@ -40,6 +41,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const queuedUrlRef = useRef<string | null>(null);
   const lastPersistRef = useRef<number>(0);
   const restoringRef = useRef<boolean>(false);
+  const mediaStreamDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
 
   const [currentFileName, setCurrentFileName] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -69,6 +71,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const source = context.createMediaElementSource(audio);
     source.connect(analyser);
     analyser.connect(context.destination);
+
+    const mediaDestination = context.createMediaStreamDestination();
+    analyser.connect(mediaDestination);
+    mediaStreamDestinationRef.current = mediaDestination;
 
     const handlePlay = () => {
       setIsPlaying(true);
@@ -164,6 +170,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (queuedUrlRef.current) {
         URL.revokeObjectURL(queuedUrlRef.current);
         queuedUrlRef.current = null;
+      }
+
+      if (mediaStreamDestinationRef.current) {
+        try {
+          analyser.disconnect(mediaStreamDestinationRef.current);
+        } catch {
+          // ignore disconnect errors
+        }
+        mediaStreamDestinationRef.current = null;
       }
 
       source.disconnect();
@@ -275,6 +290,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
+  const getAudioStream = useCallback(() => {
+    return mediaStreamDestinationRef.current?.stream ?? null;
+  }, []);
+
   const value = useMemo<AudioContextValue>(() => ({
     analyser: analyserRef.current,
     audioElement: audioElementRef.current,
@@ -290,7 +309,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     currentTime,
     duration,
     seekTo,
-  }), [clearPersistedAudio, currentFileName, currentTime, duration, getFrequencyData, getWaveformData, isPlaying, isReady, loadFile, seekTo, stop, togglePlayback]);
+    getAudioStream,
+  }), [clearPersistedAudio, currentFileName, currentTime, duration, getAudioStream, getFrequencyData, getWaveformData, isPlaying, isReady, loadFile, seekTo, stop, togglePlayback]);
 
   return <AudioContext.Provider value={value}>{children}</AudioContext.Provider>;
 };

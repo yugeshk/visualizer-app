@@ -6,7 +6,8 @@ import { useVisualizerSettings } from '@/components/settings/VisualizerSettingsP
 import { createFluidSimulation } from '@/lib/fluid/createFluidSimulation';
 import { FLUID_PRESET_MAP } from '@/lib/palettes';
 import { FluidFrequencyAnalyzer } from './FluidFrequencyAnalyzer';
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from 'react';
+import { VideoRecorderPanel } from '@/features/recording/VideoRecorderPanel';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const average = (buffer: Uint8Array, start: number, end: number) => {
   if (end <= start) return 0;
@@ -63,6 +64,7 @@ export const FluidFrame: React.FC = () => {
   const { analyser, getFrequencyData } = useAudio();
   const { settings } = useVisualizerSettings();
   const fluidSettings = settings.fluid;
+  const [recordingScale, setRecordingScale] = useState(1);
 
   const manualColor = useMemo<[number, number, number] | null>(() => {
     if (fluidSettings.paletteMode !== 'manual') return null;
@@ -174,6 +176,7 @@ export const FluidFrame: React.FC = () => {
       AUDIO_ENERGY_FLOOR: fluidSettings.energyFloor,
       AUDIO_REACTIVITY: fluidSettings.audioReactivity,
       SPLAT_PRESET: fluidSettings.splatPreset,
+      CANVAS_SCALE: recordingScale,
     });
   }, [
     fluidSettings.splatPreset,
@@ -183,6 +186,7 @@ export const FluidFrame: React.FC = () => {
     fluidSettings.densityDissipation,
     fluidSettings.velocityDissipation,
     fluidSettings.energyFloor,
+    recordingScale,
   ]);
 
   useEffect(() => {
@@ -280,6 +284,7 @@ export const FluidFrame: React.FC = () => {
         </div>
       )}
       <FluidFrequencyAnalyzer />
+      <VideoRecorderPanel canvasRef={canvasRef} onRecordingScaleChange={setRecordingScale} />
     </div>
   );
 };

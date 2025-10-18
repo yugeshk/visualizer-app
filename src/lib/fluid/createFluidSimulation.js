@@ -296,6 +296,7 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
       SUNRAYS_RESOLUTION: 196,
       SUNRAYS_WEIGHT: 1.0,
       SPLAT_PRESET: 'random',
+      CANVAS_SCALE: 1,
       AUDIO_REACTIVITY: 1,
   }
 
@@ -413,6 +414,11 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
               config.SHADING = false;
           }
           delete next.TRANSPARENT;
+      }
+      if (next.CANVAS_SCALE !== undefined) {
+          const scale = Number(next.CANVAS_SCALE);
+          if (Number.isFinite(scale) && scale > 0) config.CANVAS_SCALE = Math.min(scale, 3);
+          delete next.CANVAS_SCALE;
       }
 
       Object.assign(config, next);
@@ -1981,7 +1987,8 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
 
   function scaleByPixelRatio (input) {
       let pixelRatio = window.devicePixelRatio || 1;
-      return Math.floor(input * pixelRatio);
+      const scale = Number.isFinite(config.CANVAS_SCALE) && config.CANVAS_SCALE > 0 ? config.CANVAS_SCALE : 1;
+      return Math.floor(input * pixelRatio * scale);
   }
 
   function hashCode (s) {
