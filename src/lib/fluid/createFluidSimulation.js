@@ -1687,9 +1687,15 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
       }
   }
 
+  const getCanvasScale = () => {
+      const scale = Number.isFinite(config.CANVAS_SCALE) && config.CANVAS_SCALE > 0 ? config.CANVAS_SCALE : 1;
+      return Math.max(1, Math.min(scale, 3));
+  };
+
   function splatPointer (pointer) {
-      let dx = pointer.deltaX * config.SPLAT_FORCE;
-      let dy = pointer.deltaY * config.SPLAT_FORCE;
+      const scale = getCanvasScale();
+      let dx = pointer.deltaX * config.SPLAT_FORCE * scale;
+      let dy = pointer.deltaY * config.SPLAT_FORCE * scale;
       splat(pointer.texcoordX, pointer.texcoordY, dx, dy, pointer.color);
   }
 
@@ -1703,8 +1709,9 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
           const amountFactor = manual ? 1 : reactivity;
           const intensityScale = manual ? 1 : reactivity;
           const velocityScaleBase = manual ? 1 : reactivity;
-          const intensity = (4 + energy * 16) * intensityScale;
-          const velocityScale = (400 + energy * 900) * velocityScaleBase;
+          const resolutionScale = getCanvasScale();
+          const intensity = (4 + energy * 16) * intensityScale * resolutionScale;
+          const velocityScale = (400 + energy * 900) * velocityScaleBase * resolutionScale;
           const scaledAmount = Math.max(1, Math.min(240, Math.round(amount * amountFactor)));
 
           const emit = ({ x, y, angle, speedMultiplier = 1, spread = 0, colorScale = 1 }) => {
@@ -1778,6 +1785,21 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
       dye.swap();
   }
 
+  const triggerPointerTap = (pointer) => {
+      if (!pointer) return;
+      const boost = 20;
+      const angle = Math.random() * TAU;
+      const speed = config.SPLAT_FORCE * 0.12 * getCanvasScale();
+      const tint = {
+          r: pointer.color.r * boost,
+          g: pointer.color.g * boost,
+          b: pointer.color.b * boost,
+      };
+      const dx = Math.cos(angle) * speed;
+      const dy = Math.sin(angle) * speed;
+      splat(pointer.texcoordX, pointer.texcoordY, dx, dy, tint);
+  };
+
   function correctRadius (radius) {
       let aspectRatio = canvas.width / canvas.height;
       if (aspectRatio > 1)
@@ -1794,6 +1816,7 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
           pointers[0] = pointer;
       }
       updatePointerDownData(pointer, -1, posX, posY);
+      triggerPointerTap(pointer);
   };
 
   const handleMouseMove = (e) => {
@@ -1820,6 +1843,7 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
           const posX = scaleByPixelRatio(touches[i].pageX);
           const posY = scaleByPixelRatio(touches[i].pageY);
           updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY);
+          triggerPointerTap(pointers[i + 1]);
       }
   };
 
