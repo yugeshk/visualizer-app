@@ -296,7 +296,6 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
       SUNRAYS_RESOLUTION: 196,
       SUNRAYS_WEIGHT: 1.0,
       SPLAT_PRESET: 'random',
-      CANVAS_SCALE: 1,
       AUDIO_REACTIVITY: 1,
   }
 
@@ -415,12 +414,6 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
           }
           delete next.TRANSPARENT;
       }
-      if (next.CANVAS_SCALE !== undefined) {
-          const scale = Number(next.CANVAS_SCALE);
-          if (Number.isFinite(scale) && scale > 0) config.CANVAS_SCALE = Math.min(scale, 3);
-          delete next.CANVAS_SCALE;
-      }
-
       Object.assign(config, next);
   };
 
@@ -1687,15 +1680,9 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
       }
   }
 
-  const getCanvasScale = () => {
-      const scale = Number.isFinite(config.CANVAS_SCALE) && config.CANVAS_SCALE > 0 ? config.CANVAS_SCALE : 1;
-      return Math.max(1, Math.min(scale, 3));
-  };
-
   function splatPointer (pointer) {
-      const scale = getCanvasScale();
-      let dx = pointer.deltaX * config.SPLAT_FORCE * scale;
-      let dy = pointer.deltaY * config.SPLAT_FORCE * scale;
+      let dx = pointer.deltaX * config.SPLAT_FORCE;
+      let dy = pointer.deltaY * config.SPLAT_FORCE;
       splat(pointer.texcoordX, pointer.texcoordY, dx, dy, pointer.color);
   }
 
@@ -1709,9 +1696,8 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
           const amountFactor = manual ? 1 : reactivity;
           const intensityScale = manual ? 1 : reactivity;
           const velocityScaleBase = manual ? 1 : reactivity;
-          const resolutionScale = getCanvasScale();
-          const intensity = (4 + energy * 16) * intensityScale * resolutionScale;
-          const velocityScale = (400 + energy * 900) * velocityScaleBase * resolutionScale;
+          const intensity = (4 + energy * 16) * intensityScale;
+          const velocityScale = (400 + energy * 900) * velocityScaleBase;
           const scaledAmount = Math.max(1, Math.min(240, Math.round(amount * amountFactor)));
 
           const emit = ({ x, y, angle, speedMultiplier = 1, spread = 0, colorScale = 1 }) => {
@@ -1789,7 +1775,7 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
       if (!pointer) return;
       const boost = 20;
       const angle = Math.random() * TAU;
-      const speed = config.SPLAT_FORCE * 0.12 * getCanvasScale();
+      const speed = config.SPLAT_FORCE * 0.12;
       const tint = {
           r: pointer.color.r * boost,
           g: pointer.color.g * boost,
@@ -2011,8 +1997,7 @@ export const createFluidSimulation = (targetCanvas, userConfig) => {
 
   function scaleByPixelRatio (input) {
       let pixelRatio = window.devicePixelRatio || 1;
-      const scale = Number.isFinite(config.CANVAS_SCALE) && config.CANVAS_SCALE > 0 ? config.CANVAS_SCALE : 1;
-      return Math.floor(input * pixelRatio * scale);
+      return Math.floor(input * pixelRatio);
   }
 
   function hashCode (s) {

@@ -7,14 +7,13 @@ import { formatTime, parseTime } from '@/lib/time';
 
 interface VideoRecorderPanelProps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  onRecordingScaleChange?: (scale: number) => void;
 }
 
 type RecorderStatus = 'idle' | 'preparing' | 'recording' | 'processing' | 'ready' | 'error';
 
 const DEFAULT_CLIP_SECONDS = 12;
 
-export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRef, onRecordingScaleChange }) => {
+export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRef }) => {
   const { audioElement, currentTime, duration, isReady, getAudioStream } = useAudio();
   const { backgroundUrl } = useBackground();
 
@@ -168,8 +167,7 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
         });
       }
     }
-    onRecordingScaleChange?.(1);
-  }, [audioElement, stopMonitor, onRecordingScaleChange]);
+  }, [audioElement, stopMonitor]);
 
   const startRecording = useCallback(async () => {
     setError(null);
@@ -198,11 +196,9 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
     if (!composite || !compositeContextRef.current) {
       setStatus('error');
       setError('Unable to prepare recording surface.');
-      onRecordingScaleChange?.(1);
       return;
     }
 
-    onRecordingScaleChange?.(qualityScale);
     await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
 
     const stream = composite.captureStream(60);
@@ -234,7 +230,6 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
       const message = err instanceof Error ? err.message : 'MediaRecorder is not supported in this browser.';
       setStatus('error');
       setError(message);
-      onRecordingScaleChange?.(1);
       return;
     }
 
@@ -258,7 +253,6 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
       const url = URL.createObjectURL(blob);
       setDownloadUrl(url);
       setStatus('ready');
-      onRecordingScaleChange?.(1);
     };
 
     recorder.onerror = (event) => {
@@ -266,7 +260,6 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
       stopMonitor();
       setStatus('error');
       setError(`Recording error: ${event.error?.message ?? event.error?.name ?? 'unknown error'}`);
-      onRecordingScaleChange?.(1);
     };
 
     previousPlaybackRef.current = {
@@ -291,7 +284,6 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
       setStatus('error');
       setError(`${message} Interact with the page and try again.`);
       recorder.stop();
-      onRecordingScaleChange?.(1);
       return;
     }
 
@@ -304,7 +296,7 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
       stopMonitorRafRef.current = window.requestAnimationFrame(monitor);
     };
     monitor();
-  }, [audioElement, canvasRef, drawFrame, enabled, ensureCompositeCanvas, finalizeRecording, getAudioStream, downloadUrl, safeEndTime, safeStartTime, seekable, startCopyLoop, stopCopyLoop, stopMonitor, qualityScale, onRecordingScaleChange]);
+  }, [audioElement, canvasRef, drawFrame, enabled, ensureCompositeCanvas, finalizeRecording, getAudioStream, downloadUrl, safeEndTime, safeStartTime, seekable, startCopyLoop, stopCopyLoop, stopMonitor, qualityScale]);
 
   const handleGenerate = useCallback(() => {
     if (status === 'recording' || status === 'processing') return;
@@ -329,8 +321,7 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
     }
     setStatus('idle');
     setError(null);
-    onRecordingScaleChange?.(1);
-  }, [audioElement, onRecordingScaleChange, stopCopyLoop, stopMonitor]);
+  }, [audioElement, stopCopyLoop, stopMonitor]);
 
   const handleDisable = useCallback((checked: boolean) => {
     setEnabled(checked);
@@ -341,9 +332,8 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
         URL.revokeObjectURL(downloadUrl);
         setDownloadUrl(null);
       }
-      onRecordingScaleChange?.(1);
     }
-  }, [downloadUrl, onRecordingScaleChange]);
+  }, [downloadUrl]);
 
   return (
     <section className="rounded-md border border-slate-800 bg-slate-900/60 p-4 text-slate-200 shadow">
