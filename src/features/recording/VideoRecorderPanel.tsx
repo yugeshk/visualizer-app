@@ -374,9 +374,20 @@ export const VideoRecorderPanel: React.FC<VideoRecorderPanelProps> = ({ canvasRe
               label="End"
               value={safeEndTime}
               max={duration}
-              onChange={(secs) => setEndTime(Math.max(secs, safeStartTime + 0.2))}
+              onChange={(secs) => {
+                const minEnd = safeStartTime + 0.2;
+                const candidate = Math.max(secs, minEnd);
+                setEndTime(clampRange(candidate, 0, duration || candidate));
+              }}
               currentTime={currentTime}
-              onSetCurrent={() => setEndTime(Math.max(currentTime, safeStartTime + 0.2))}
+              onSetCurrent={() => {
+                const minEnd = safeStartTime + 0.2;
+                const durationTarget = duration > 0 ? duration : currentTime;
+                const candidate = Math.max(durationTarget, minEnd);
+                const capped = duration > 0 ? Math.min(candidate, duration) : candidate;
+                setEndTime(capped);
+              }}
+              setLabel={duration > 0 ? `Set to End (${formatTime(duration)})` : undefined}
             />
             <div className="flex flex-col gap-2">
               <label className="text-slate-300">Quality</label>
@@ -462,9 +473,10 @@ interface TimeFieldProps {
   onChange: (seconds: number) => void;
   currentTime: number;
   onSetCurrent: () => void;
+  setLabel?: string;
 }
 
-const TimeField: React.FC<TimeFieldProps> = ({ label, value, max, onChange, currentTime, onSetCurrent }) => {
+const TimeField: React.FC<TimeFieldProps> = ({ label, value, max, onChange, currentTime, onSetCurrent, setLabel }) => {
   const [display, setDisplay] = useState(formatTime(value));
 
   useEffect(() => {
@@ -489,7 +501,7 @@ const TimeField: React.FC<TimeFieldProps> = ({ label, value, max, onChange, curr
             onSetCurrent();
           }}
         >
-          Set to {formatTime(currentTime)}
+          {setLabel ?? `Set to ${formatTime(currentTime)}`}
         </button>
       </div>
       <input
