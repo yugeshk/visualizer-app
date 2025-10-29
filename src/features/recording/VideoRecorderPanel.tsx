@@ -6,7 +6,7 @@ import { useBackground } from '@/components/background/BackgroundProvider';
 import { formatTime, parseTime } from '@/lib/time';
 
 interface VideoRecorderPanelProps {
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   onRecordingScaleChange?: (scale: number) => void;
 }
 
